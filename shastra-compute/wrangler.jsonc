@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "shastra-compute",
+  "main": "worker.ts",
+  "compatibility_date": "2025-01-01",
+
+  // Cloudflare Containers configuration
+  // The Docker image is built from ./Dockerfile
+  "containers": [
+    {
+      "class_name": "ShastraCompute",
+      "image": "./Dockerfile",
+      "max_instances": 10
+    }
+  ],
+
+  // Durable Object binding for the container
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SHASTRA_COMPUTE",
+        "class_name": "ShastraCompute"
+      }
+    ]
+  },
+
+  // Migration tag for Durable Object SQLite storage
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ShastraCompute"]
+    }
+  ]
+}

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "deploy": "opennextjs-cloudflare && wrangler pages deploy"
   },
   "keywords": [],
   "author": "",
@@ -28,5 +29,9 @@
     "react-markdown": "^10.1.0",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.0.0",
+    "wrangler": "^4.0.0"
   }
 }
