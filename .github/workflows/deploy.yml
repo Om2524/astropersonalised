@@ -1,8 +1,9 @@
 name: Deploy Sudarshan
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       services:
@@ -10,7 +11,7 @@ on:
         default: "convex,compute,frontend"
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy
   cancel-in-progress: false
 
 jobs:
@@ -19,7 +20,7 @@ jobs:
     name: Deploy Convex
     runs-on: ubuntu-latest
     if: >
-      github.event_name == 'release' ||
+      github.event_name == 'push' ||
       contains(github.event.inputs.services, 'convex')
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
     name: Deploy Shastra Compute
     runs-on: ubuntu-latest
     if: >
-      github.event_name == 'release' ||
+      github.event_name == 'push' ||
       contains(github.event.inputs.services, 'compute')
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +66,7 @@ jobs:
     if: >
       always() &&
       (needs.convex.result == 'success' || needs.convex.result == 'skipped') &&
-      (github.event_name == 'release' || contains(github.event.inputs.services, 'frontend'))
+      (github.event_name == 'push' || contains(github.event.inputs.services, 'frontend'))
     defaults:
       run:
         working-directory: apps/web
@@ -96,3 +97,39 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ── Create GitHub Release ───────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [convex, compute, frontend]
+    if: always() && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag
+        id: prev
+        run: |
+          PREV=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p')
+          echo "tag=${PREV:-$(git rev-list --max-parents=0 HEAD)}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "## Changes" > changelog.md
+          git log ${{ steps.prev.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s (%h)" >> changelog.md
+          echo "" >> changelog.md
+          echo "---" >> changelog.md
+          echo "**Deployed:** Convex (${{ needs.convex.result }}) | Compute (${{ needs.compute.result }}) | Frontend (${{ needs.frontend.result }})" >> changelog.md
+
+      - name: Create release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --notes-file changelog.md
+        env:
+          GH_TOKEN: ${{ github.token }}

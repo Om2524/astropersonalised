@@ -63,27 +63,33 @@ User → forsee.life (Cloudflare Pages / Next.js 16)
 
 Shastra Compute uses: `API_KEY`, `STREAM_TOKEN_SECRET`, `GEMINI_API_KEY` (set in Cloudflare dashboard).
 
-## Deploy
+## Releasing
 
-All three services deploy on GitHub release tag via `.github/workflows/deploy.yml`:
+Tag-based deploys. Push a semver tag → GitHub Actions deploys all services → auto-creates a GitHub Release with changelog.
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
-# Then create a release on GitHub from the tag
+# Bump patch (0.0.1 → 0.0.2) — default
+./scripts/release.sh
+
+# Bump minor (0.0.2 → 0.1.0)
+./scripts/release.sh minor
+
+# Bump major (0.1.0 → 1.0.0)
+./scripts/release.sh major
 ```
 
-GitHub Secrets needed: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CONVEX_DEPLOY_KEY`, `NEXT_PUBLIC_CONVEX_URL`
+The script auto-detects the latest tag, increments, shows pending commits, and pushes.
 
-Manual deploy:
+**Versioning**: `v{major}.{minor}.{patch}` — starts at `v0.0.1`. The latest tag is always the current production deployment.
+
+**GitHub Secrets**: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CONVEX_DEPLOY_KEY`, `NEXT_PUBLIC_CONVEX_URL`
+
+Manual deploy (if needed):
 ```bash
-# Convex
-npx convex deploy --cmd 'echo skip'
-
-# Shastra Compute
-cd shastra-compute && npx wrangler deploy
-
-# Frontend
-cd apps/web && pnpm exec opennextjs-cloudflare && pnpm exec wrangler pages deploy .open-next --project-name=forsee-life
+npx convex deploy --cmd 'echo skip'                    # Convex
+cd shastra-compute && npx wrangler deploy               # Compute
+cd apps/web && pnpm exec opennextjs-cloudflare && \
+  pnpm exec wrangler pages deploy .open-next --project-name=forsee-life  # Frontend
 ```
 
 ## Conventions
