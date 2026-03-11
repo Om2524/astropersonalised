@@ -40,10 +40,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Deploy functions + schema
-        run: npx convex deploy
+        run: |
+          ln -s apps/web/node_modules node_modules
+          ln -s apps/web/package.json package.json
+          npx convex deploy
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-          NODE_PATH: apps/web/node_modules
 
   # ── Shastra Compute (Cloudflare Containers) ─────────────────
   compute:
