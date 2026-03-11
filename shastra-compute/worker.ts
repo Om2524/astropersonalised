@@ -6,9 +6,9 @@
  * of inactivity and scale up to 10 instances under load.
  *
  * Traffic is distributed across container instances using random
- * selection from the Durable Object namespace.
+ * selection via getContainer.
  */
-import { Container } from "cloudflare:container";
+import { Container, getContainer } from "@cloudflare/containers";
 
 export class ShastraCompute extends Container {
   /** Port the FastAPI uvicorn server listens on inside the container. */
@@ -16,34 +16,10 @@ export class ShastraCompute extends Container {
 
   /** Scale to zero after 30 seconds of no requests. */
   sleepAfter = "30s";
-
-  override onStart(): void {
-    console.log("[shastra-compute] Container started");
-  }
-
-  override onStop(): void {
-    console.log("[shastra-compute] Container stopped");
-  }
 }
 
 interface Env {
-  SHASTRA_COMPUTE: DurableObjectNamespace;
-}
-
-/**
- * Get a random container instance from the Durable Object namespace.
- *
- * Distributes load across up to `maxInstances` container instances
- * using random selection. Each instance ID maps to a separate
- * container that can independently scale to zero.
- */
-async function getRandomInstance(
-  ns: DurableObjectNamespace,
-  maxInstances: number,
-): Promise<DurableObjectStub> {
-  const instanceId = Math.floor(Math.random() * maxInstances);
-  const id = ns.idFromName(String(instanceId));
-  return ns.get(id);
+  SHASTRA_COMPUTE: DurableObjectNamespace<ShastraCompute>;
 }
 
 export default {
@@ -62,7 +38,9 @@ export default {
       });
     }
 
-    const container = await getRandomInstance(env.SHASTRA_COMPUTE, 10);
+    // Distribute load across up to 10 container instances using random selection
+    const instanceId = String(Math.floor(Math.random() * 10));
+    const container = getContainer(env.SHASTRA_COMPUTE, instanceId);
     const response = await container.fetch(request);
 
     // Clone response to add CORS headers
