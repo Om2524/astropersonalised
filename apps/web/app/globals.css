@@ -1,0 +1,303 @@
+@import "tailwindcss";
+
+@theme {
+  /* Sky Blue palette — matches ChatGPT liquid glass */
+  --color-bg-start: #a8cbee;
+  --color-bg-mid: #c6ddf5;
+  --color-bg-end: #dce8f8;
+
+  /* Legacy aliases for easy migration */
+  --color-graphite: #b8d4f2;
+  --color-navy: rgba(255, 255, 255, 0.35);
+  --color-indigo: #5b6abf;
+  --color-accent: #4a7fd4;
+  --color-accent-warm: #d4a574;
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #5a5a7a;
+}
+
+body {
+  background: linear-gradient(180deg, #a8cbee 0%, #b8d6f4 25%, #d0e3f8 50%, #dfe9f6 75%, #e8edf8 100%);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  min-height: 100dvh;
+}
+
+/* ============================================================
+   LIQUID GLASS — White frosted glass on blue gradient
+   Matches ChatGPT's liquid glass design language
+   ============================================================ */
+
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.32);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 24px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.liquid-glass:focus-within {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 3px rgba(74, 127, 212, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Hero variant — more prominent for centered welcome input */
+.liquid-glass-hero {
+  background: rgba(255, 255, 255, 0.38);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 8px 48px rgba(0, 0, 0, 0.08),
+    0 0 80px rgba(74, 127, 212, 0.06);
+}
+
+/* Dropdown glass */
+.liquid-glass-dropdown {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: 0.875rem;
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 12px 40px rgba(0, 0, 0, 0.1);
+  animation: dropdown-in 0.2s ease-out;
+}
+
+/* Glass card — for example questions, sections */
+.glass-card {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.875rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.25s;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(74, 127, 212, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* Glass panel — sidebar, sections */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.25);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(40px) saturate(1.3);
+  -webkit-backdrop-filter: blur(40px) saturate(1.3);
+}
+
+/* User chat bubble — white glass, right-aligned */
+.user-bubble {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Assistant bubble — subtle blue tint */
+.assistant-bubble {
+  background: rgba(74, 127, 212, 0.08);
+  border: 1px solid rgba(74, 127, 212, 0.12);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+/* Section card — for pages like chart, daily, etc */
+.glass-section {
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 1rem;
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* Accent pill button — like ChatGPT's "Search" button */
+.accent-pill {
+  background: var(--color-accent);
+  color: white;
+  border-radius: 999px;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(74, 127, 212, 0.2);
+}
+
+.accent-pill:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px rgba(74, 127, 212, 0.3);
+}
+
+/* ============================================================
+   COSMIC LOGO — Orbital animations
+   ============================================================ */
+
+.animate-orbit-slow {
+  animation: orbit-tilt 20s linear infinite;
+}
+
+.animate-orbit-reverse {
+  animation: orbit-tilt-reverse 14s linear infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+
+@keyframes orbit-tilt {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orbit-tilt-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================
+   STREAMING — Cursor + text reveal
+   ============================================================ */
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--color-accent);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursor-blink 1s steps(2) infinite;
+}
+
+@keyframes cursor-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ============================================================
+   ANALYSIS LEDGER — Shimmer + fade
+   ============================================================ */
+
+.shimmer-bar {
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(74, 127, 212, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.animate-ledger-fade {
+  animation: ledger-fade 0.4s ease-out;
+}
+
+@keyframes ledger-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   DROPDOWN + FADE ANIMATIONS
+   ============================================================ */
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s ease-out both;
+}
+
+/* ============================================================
+   FORM INPUTS — Light theme
+   ============================================================ */
+
+.glass-input-field {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 0.75rem 1rem;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.glass-input-field::placeholder {
+  color: rgba(90, 90, 122, 0.4);
+}
+
+.glass-input-field:focus {
+  border-color: rgba(74, 127, 212, 0.4);
+  box-shadow: 0 0 0 3px rgba(74, 127, 212, 0.1);
+}
+
+/* Date/time inputs */
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+}
+
+/* ============================================================
+   SCROLLBAR — Minimal on light background
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
