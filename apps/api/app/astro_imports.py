@@ -9,8 +9,18 @@ import importlib.util
 import sys
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]  # shastra/
-_ASTRO_CORE = _REPO_ROOT / "packages" / "astro-core"
+# Resolve repo root — walk up until we find packages/astro-core
+_THIS = Path(__file__).resolve()
+_ASTRO_CORE = None
+for parent in _THIS.parents:
+    candidate = parent / "packages" / "astro-core"
+    if candidate.exists():
+        _ASTRO_CORE = candidate
+        break
+if _ASTRO_CORE is None:
+    # Fallback: check PYTHONPATH (Docker sets this)
+    import astro_core as _ac
+    _ASTRO_CORE = Path(_ac.__file__).resolve().parent
 
 
 def _register(module_name: str, file_path: Path, search_locations: list[str] | None = None):
