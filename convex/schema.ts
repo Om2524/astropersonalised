@@ -87,7 +87,7 @@ const schema = defineSchema({
   })
     .index("by_sessionId", ["sessionId", "createdAt"])
     .index("by_userId", ["userId", "createdAt"])
-    .index("by_userId_saved", ["userId", "isSaved"]),
+    .index("by_userId_saved", ["userId", "isSaved", "createdAt"]),
 
   /**
    * One record per query for rate limiting.

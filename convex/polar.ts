@@ -28,9 +28,11 @@ export const polar = new Polar<DataModel>(components.polar, {
       email: identity.email!,
     };
   },
+  // Product IDs from Polar.sh dashboard.
+  // Replace these placeholders with actual IDs after creating products.
   products: {
-    dhyan: process.env.POLAR_DHYAN_PRODUCT_ID ?? "",
-    moksha: process.env.POLAR_MOKSHA_PRODUCT_ID ?? "",
+    dhyan: "REPLACE_WITH_POLAR_DHYAN_PRODUCT_ID",
+    moksha: "REPLACE_WITH_POLAR_MOKSHA_PRODUCT_ID",
   },
 });
 
