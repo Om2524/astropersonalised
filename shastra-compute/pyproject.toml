@@ -1,0 +1,21 @@
+[project]
+name = "shastra-compute"
+version = "1.0.0"
+description = "Stateless astrology computation API -- chart calculation, evidence extraction, and LLM-powered readings."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "google-genai>=1.0",
+    "pyswisseph>=2.10",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "httpx>=0.28",
+    "timezonefinder>=6.5",
+    "python-dateutil>=2.9",
+    "pytz>=2024.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

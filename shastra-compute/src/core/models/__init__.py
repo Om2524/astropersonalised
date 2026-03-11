@@ -1,0 +1,1 @@
+"""Chart data models."""
