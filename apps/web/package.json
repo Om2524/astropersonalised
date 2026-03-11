@@ -14,7 +14,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.31.0",
   "dependencies": {
-    "@auth/core": "^0.34.3",
+    "@auth/core": "^0.37.0",
     "@convex-dev/auth": "^0.0.91",
     "@convex-dev/polar": "^0.8.1",
     "@tailwindcss/postcss": "^4.2.1",
