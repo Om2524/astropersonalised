@@ -1,5 +1,9 @@
 # Sudarshan (Shastra) — Personalized Astrology AI
 
+## Philosophy
+
+Test on prod. Ship to prod. There is no dev environment. The latest git tag is the live deployment. Push code, tag it, see real changes at forsee.life.
+
 ## Architecture
 
 Three-layer system deployed on Cloudflare + Convex:
@@ -50,39 +54,77 @@ User → forsee.life (Cloudflare Pages / Next.js 16)
 
 ## Deployments
 
-| Service | Environment | URL |
+| Service | URL |
+|---|---|
+| Convex | `https://modest-mouse-216.convex.cloud` |
+| Convex HTTP | `https://modest-mouse-216.convex.site` |
+| Frontend | `forsee.life` (Cloudflare Pages) |
+| Compute API | `api.forsee.life` (Cloudflare Containers) |
+
+## Credentials
+
+All secrets are stored in two places. Never commit secrets to the repo.
+
+### Convex Environment Variables
+
+Stored in Convex dashboard. Update via CLI or MCP:
+
+```bash
+npx convex env set <NAME> <VALUE> --prod
+npx convex env list --prod
+```
+
+| Variable | What | Source |
 |---|---|---|
-| Convex (prod) | US East | `https://modest-mouse-216.convex.cloud` |
-| Convex (dev) | US East | `https://silent-fly-721.convex.cloud` |
-| Frontend | Cloudflare Pages | `forsee.life` |
-| Compute API | Cloudflare Containers | `api.forsee.life` |
+| `SHASTRA_COMPUTE_URL` | Python API URL | `https://api.forsee.life` |
+| `SHASTRA_COMPUTE_API_KEY` | Shared secret between Convex and Python API | Generated: `openssl rand -hex 32` |
+| `STREAM_TOKEN_SECRET` | HMAC signing key for streaming tokens | Generated: `openssl rand -hex 32` |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID | [Google Cloud Console → astra project → Credentials](https://console.cloud.google.com/apis/credentials?project=astra-474015) |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret | Same as above |
+| `AUTH_RESEND_KEY` | Email magic link API key | [Resend dashboard](https://resend.com/api-keys) |
+| `GEMINI_API_KEY` | Google Gemini LLM key | [Google AI Studio](https://aistudio.google.com/apikey) |
+| `POLAR_ORGANIZATION_TOKEN` | Polar API access | [Polar → Settings → API](https://polar.sh) |
+| `POLAR_WEBHOOK_SECRET` | Validates Polar webhook payloads | [Polar → Webhooks](https://polar.sh) (endpoint: `https://modest-mouse-216.convex.site/polar/events`) |
 
-## Env Vars (all set on Convex prod)
+### GitHub Secrets
 
-`SHASTRA_COMPUTE_URL`, `SHASTRA_COMPUTE_API_KEY`, `STREAM_TOKEN_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_RESEND_KEY`, `GEMINI_API_KEY`, `POLAR_ORGANIZATION_TOKEN`, `POLAR_WEBHOOK_SECRET`
+Stored in repo Settings → Secrets and variables → Actions. Used by deploy workflow.
 
-Shastra Compute uses: `API_KEY`, `STREAM_TOKEN_SECRET`, `GEMINI_API_KEY` (set in Cloudflare dashboard).
+| Secret | What | Source |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Deploys Workers + Pages | [Cloudflare → API Tokens](https://dash.cloudflare.com/profile/api-tokens) |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account | `2cb82847353e20a3b3d18bf81dc30449` |
+| `CONVEX_DEPLOY_KEY` | Deploys Convex functions | [Convex dashboard → Settings → Deploy keys](https://dashboard.convex.dev/t/forsee/sudarshan/modest-mouse-216/settings) |
+| `NEXT_PUBLIC_CONVEX_URL` | Baked into frontend build | `https://modest-mouse-216.convex.cloud` |
+
+### Cloudflare Worker Secrets
+
+Set in Cloudflare dashboard for the shastra-compute worker. Must match Convex values.
+
+| Secret | Must match |
+|---|---|
+| `API_KEY` | Same as `SHASTRA_COMPUTE_API_KEY` in Convex |
+| `STREAM_TOKEN_SECRET` | Same as `STREAM_TOKEN_SECRET` in Convex |
+| `GEMINI_API_KEY` | Same as `GEMINI_API_KEY` in Convex |
+
+### Google OAuth
+
+Managed at [Google Cloud Console → astra project](https://console.cloud.google.com/apis/credentials?project=astra-474015).
+
+- Authorized JS origins: `https://forsee.life`
+- Authorized redirect URI: `https://modest-mouse-216.convex.site/api/auth/callback/google`
 
 ## Releasing
 
 Tag-based deploys. Push a semver tag → GitHub Actions deploys all services → auto-creates a GitHub Release with changelog.
 
 ```bash
-# Bump patch (0.0.1 → 0.0.2) — default
-./scripts/release.sh
-
-# Bump minor (0.0.2 → 0.1.0)
-./scripts/release.sh minor
-
-# Bump major (0.1.0 → 1.0.0)
-./scripts/release.sh major
+./scripts/release.sh          # patch: 0.0.1 → 0.0.2
+./scripts/release.sh minor    # minor: 0.0.2 → 0.1.0
+./scripts/release.sh major    # major: 0.1.0 → 1.0.0
 ```
 
-The script auto-detects the latest tag, increments, shows pending commits, and pushes.
-
-**Versioning**: `v{major}.{minor}.{patch}` — starts at `v0.0.1`. The latest tag is always the current production deployment.
-
-**GitHub Secrets**: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CONVEX_DEPLOY_KEY`, `NEXT_PUBLIC_CONVEX_URL`
+The latest tag is always the live deployment. Versioning starts at `v0.0.1`.
 
 Manual deploy (if needed):
 ```bash
@@ -94,6 +136,7 @@ cd apps/web && pnpm exec opennextjs-cloudflare && \
 
 ## Conventions
 
+- Test on prod. No staging, no dev deployments.
 - Frontend uses Convex hooks (`useQuery`, `useAction`) — never calls Python API directly (except streaming)
 - Streaming uses HMAC-signed tokens (60s expiry) issued by `authorizeStream` action
 - Rate limiting uses rolling 7-day window with compound indexes on `queryUsage`
