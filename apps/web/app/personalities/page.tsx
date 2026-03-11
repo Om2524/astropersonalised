@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { ArrowLeft, Loader2, Users } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/app/store";
-import { getPersonalityResonance } from "@/app/api";
+import { useSubscription } from "@/app/hooks/useSubscription";
 
 interface PersonalityMatch {
   name: string; category: string; match_percentage: number;
@@ -64,22 +66,39 @@ function PersonalityCard({ person }: { person: PersonalityMatch }) {
 
 export default function PersonalitiesPage() {
   const router = useRouter();
-  const { chart } = useApp();
+  const { chart, chartRaw, sessionId } = useApp();
+  const subscription = useSubscription(sessionId);
+  const personalityMatchAction = useAction(api.actions.personalityMatch.personalityMatch);
+
   const [matches, setMatches] = useState<PersonalityMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!chart) { router.replace("/onboarding"); return; }
+    if (!chart || !chartRaw) { router.replace("/onboarding"); return; }
     let cancelled = false;
     (async () => {
       try {
-        const data = await getPersonalityResonance(chart as unknown as Record<string, unknown>);
-        if (!cancelled) { setMatches(data.matches ?? data.personalities ?? data); setLoading(false); }
-      } catch (err) { if (!cancelled) { setError(err instanceof Error ? err.message : "Something went wrong"); setLoading(false); } }
+        const data = await personalityMatchAction({
+          chartData: chartRaw,
+          tier: subscription.tier,
+        });
+        if (!cancelled) {
+          const result = data as Record<string, unknown>;
+          setMatches(
+            (result.matches ?? result.personalities ?? data) as PersonalityMatch[]
+          );
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Something went wrong");
+          setLoading(false);
+        }
+      }
     })();
     return () => { cancelled = true; };
-  }, [chart, router]);
+  }, [chart, chartRaw, router, personalityMatchAction, subscription.tier]);
 
   if (!chart) return null;
 

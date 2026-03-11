@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { useApp } from "@/app/store";
-import { askReadingStream } from "@/app/api";
+import { useSubscription } from "@/app/hooks/useSubscription";
 import type { ChatMessage, ReadingResponse, PlanetContext } from "@/app/types";
 import Sidebar from "./components/Sidebar";
 import ChatInput from "./components/ChatInput";
@@ -14,10 +16,10 @@ import YogaCards from "./components/YogaCards";
 import HouseRelevance from "./components/HouseRelevance";
 import DashaBadge from "./components/DashaBadge";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
+import UsageIndicator from "@/app/components/UsageIndicator";
 
 /**
  * Split streaming content into main body and "Explore Further" questions.
- * The streaming prompt produces a "## Explore Further" section with bullet points.
  */
 function parseExploreFurther(content: string): {
   body: string;
@@ -31,7 +33,7 @@ function parseExploreFurther(content: string): {
   const section = match[0];
   const questions = section
     .split("\n")
-    .map((line) => line.replace(/^[-*•]\s*/, "").trim())
+    .map((line) => line.replace(/^[-*\u2022]\s*/, "").trim())
     .filter((line) => line.length > 10 && !line.startsWith("#"));
 
   return { body, questions };
@@ -50,13 +52,6 @@ function generateId() {
 
 /**
  * Word-level reveal buffer with throttled updates.
- *
- * Why this works like ChatGPT:
- * 1. Incoming Gemini chunks go into a raw buffer
- * 2. We reveal word-by-word (not char-by-char) — words are the natural reading unit
- * 3. We throttle React state updates to every 50ms instead of every frame
- *    This means react-markdown only re-parses ~20x/sec, not 60x
- * 4. Words appear at a natural reading pace (~15 words/sec)
  */
 function useStreamBuffer() {
   const rawRef = useRef("");
@@ -73,14 +68,10 @@ function useStreamBuffer() {
     revealedRef.current = "";
     rawRef.current = "";
 
-    // Tick every 50ms — reveal next batch of words
     timerRef.current = setInterval(() => {
       if (revealedRef.current.length >= rawRef.current.length) return;
 
       const remaining = rawRef.current.slice(revealedRef.current.length);
-
-      // Reveal ~3-4 words per tick (at 50ms interval = ~60-80 words/sec)
-      // Find the position after the next 3 word boundaries
       let pos = 0;
       let wordsFound = 0;
       const wordsPerTick = 3;
@@ -121,7 +112,10 @@ function useStreamBuffer() {
 }
 
 export default function ChatPage() {
-  const { profile, chart } = useApp();
+  const { sessionId, profile, chart, chartRaw, tone } = useApp();
+  const subscription = useSubscription(sessionId);
+  const authorizeStreamAction = useAction(api.actions.authorizeStream.authorizeStream);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [method, setMethod] = useState<string>("vedic");
   const [isLoading, setIsLoading] = useState(false);
@@ -144,7 +138,7 @@ export default function ChatPage() {
   }, [messages, ledgerSteps, scrollToBottom]);
 
   const handleSubmit = useCallback(
-    (query: string) => {
+    async (query: string) => {
       if (isLoading) return;
 
       const userMsg: ChatMessage = {
@@ -167,104 +161,213 @@ export default function ChatPage() {
       setLedgerSteps([]);
       setLedgerComplete(false);
 
-      let fullContent = "";
-      let classification: Record<string, unknown> | undefined;
-      let evidenceSummary: Record<string, unknown> | undefined;
-      let planetContext: PlanetContext | undefined;
-
-      streamBuffer.start((revealed) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: revealed } : m
-          )
-        );
-      });
-
-      const abort = askReadingStream(
-        {
+      try {
+        // Authorize the stream via Convex (handles rate limiting + HMAC token)
+        const authResult = await authorizeStreamAction({
+          sessionId,
           query,
           method,
-          tone: profile?.tone || "practical",
-          chart_data: chart
-            ? (chart as unknown as Record<string, unknown>)
-            : undefined,
-          date_of_birth: profile?.date_of_birth,
-          time_of_birth: profile?.time_of_birth,
-          birthplace: profile?.birthplace,
-          birth_time_quality: profile?.birth_time_quality,
-        },
-        {
-          onLedger(step, message) {
-            setLedgerSteps((prev) => [...prev, { step, message }]);
-          },
-          onClassification(data) {
-            classification = data;
-          },
-          onEvidence(data) {
-            evidenceSummary = data;
-          },
-          onPlanetContext(data) {
-            planetContext = data as unknown as PlanetContext;
-            // Immediately show planet context on the message
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, planet_context: planetContext }
-                  : m
-              )
-            );
-          },
-          onContent(text) {
-            fullContent += text;
-            streamBuffer.push(text);
-          },
-          onDone(data) {
-            streamBuffer.flush();
-            streamBuffer.stop();
-            setLedgerComplete(true);
+        });
 
-            const reading = data.reading as ReadingResponse | undefined;
-            const methodUsed = data.method_used as string | undefined;
-
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: fullContent || reading?.direct_answer || "",
-                      reading: reading,
-                      classification:
-                        classification as ChatMessage["classification"],
-                      evidence_summary: evidenceSummary,
-                      planet_context: planetContext,
-                      method_used: methodUsed,
-                    }
-                  : m
-              )
-            );
-            setIsLoading(false);
-          },
-          onError(message) {
-            streamBuffer.stop();
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: `Something went wrong: ${message}. Please try again.`,
-                    }
-                  : m
-              )
-            );
-            setIsLoading(false);
-            setLedgerComplete(true);
-          },
+        if (!authResult.success || !authResult.token || !authResult.streamUrl) {
+          // Rate limited or error
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content:
+                      authResult.message ||
+                      "You have reached your query limit for this week.",
+                  }
+                : m
+            )
+          );
+          setIsLoading(false);
+          setLedgerComplete(true);
+          return;
         }
-      );
 
-      abortRef.current = abort;
+        // Open SSE connection directly to the Python API
+        let fullContent = "";
+        let classification: Record<string, unknown> | undefined;
+        let evidenceSummary: Record<string, unknown> | undefined;
+        let planetContext: PlanetContext | undefined;
+
+        streamBuffer.start((revealed) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: revealed } : m
+            )
+          );
+        });
+
+        const controller = new AbortController();
+        abortRef.current = () => controller.abort();
+
+        const res = await fetch(authResult.streamUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authResult.token}`,
+          },
+          body: JSON.stringify({
+            query,
+            method,
+            chart_data: chartRaw || "{}",
+            tone: tone || "practical",
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => "Stream connection failed");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `Something went wrong: ${errText}. Please try again.` }
+                : m
+            )
+          );
+          setIsLoading(false);
+          setLedgerComplete(true);
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split("\n\n");
+          buffer = events.pop() || "";
+
+          for (const event of events) {
+            if (!event.trim()) continue;
+            const lines = event.trim().split("\n");
+            let eventType = "";
+            let eventData = "";
+
+            for (const line of lines) {
+              if (line.startsWith("event: ")) eventType = line.slice(7);
+              else if (line.startsWith("data: ")) eventData = line.slice(6);
+            }
+
+            if (!eventType || !eventData) continue;
+
+            try {
+              const parsed = JSON.parse(eventData);
+              switch (eventType) {
+                case "ledger":
+                  setLedgerSteps((prev) => [...prev, { step: parsed.step, message: parsed.message }]);
+                  break;
+                case "classification":
+                  classification = parsed;
+                  break;
+                case "evidence_summary":
+                  evidenceSummary = parsed;
+                  break;
+                case "planet_context":
+                  planetContext = parsed as unknown as PlanetContext;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? { ...m, planet_context: planetContext }
+                        : m
+                    )
+                  );
+                  break;
+                case "content":
+                  fullContent += parsed.text;
+                  streamBuffer.push(parsed.text);
+                  break;
+                case "done": {
+                  streamBuffer.flush();
+                  streamBuffer.stop();
+                  setLedgerComplete(true);
+
+                  const reading = parsed.reading as ReadingResponse | undefined;
+                  const methodUsed = parsed.method_used as string | undefined;
+
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? {
+                            ...m,
+                            content: fullContent || reading?.direct_answer || "",
+                            reading: reading,
+                            classification:
+                              classification as ChatMessage["classification"],
+                            evidence_summary: evidenceSummary,
+                            planet_context: planetContext,
+                            method_used: methodUsed,
+                          }
+                        : m
+                    )
+                  );
+                  setIsLoading(false);
+                  break;
+                }
+                case "error":
+                  streamBuffer.stop();
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? {
+                            ...m,
+                            content: `Something went wrong: ${parsed.message}. Please try again.`,
+                          }
+                        : m
+                    )
+                  );
+                  setIsLoading(false);
+                  setLedgerComplete(true);
+                  break;
+              }
+            } catch {
+              // skip malformed events
+            }
+          }
+        }
+
+        // If stream ended without a "done" event
+        if (isLoading) {
+          streamBuffer.flush();
+          streamBuffer.stop();
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId && !m.reading
+                ? { ...m, content: fullContent || m.content }
+                : m
+            )
+          );
+          setIsLoading(false);
+          setLedgerComplete(true);
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          streamBuffer.stop();
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: `Something went wrong: ${(err as Error).message}. Please try again.`,
+                  }
+                : m
+            )
+          );
+          setIsLoading(false);
+          setLedgerComplete(true);
+        }
+      }
     },
-    [isLoading, method, profile, chart, streamBuffer]
+    [isLoading, method, sessionId, chartRaw, tone, authorizeStreamAction, streamBuffer]
   );
 
   const handleNewReading = useCallback(() => {
@@ -317,6 +420,18 @@ export default function ChatPage() {
                 onMethodChange={setMethod}
                 centered
               />
+              {/* Usage indicator */}
+              {!subscription.loading && (
+                <div className="mt-2 flex justify-end">
+                  <UsageIndicator
+                    used={subscription.used}
+                    limit={subscription.limit}
+                    remaining={subscription.remaining}
+                    tier={subscription.tier}
+                    resetsAt={subscription.resetsAt}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="mt-6 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -339,16 +454,13 @@ export default function ChatPage() {
                 {messages.map((msg) => (
                   <div key={msg.id}>
                     {msg.role === "user" ? (
-                      /* User message — glass bubble, right-aligned */
                       <div className="flex justify-end">
                         <div className="user-bubble rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm text-text-primary max-w-[80%]">
                           {msg.content}
                         </div>
                       </div>
                     ) : (
-                      /* Assistant message */
                       <div>
-                        {/* Thinking state */}
                         {isLoading &&
                           msg.id === messages[messages.length - 1]?.id && (
                             <AnalysisLedger
@@ -357,7 +469,6 @@ export default function ChatPage() {
                             />
                           )}
 
-                        {/* Visual planet context cards — show after planet_context arrives */}
                         {msg.planet_context && !isLoading && (
                           <div className="mb-3">
                             <PlanetCards planets={msg.planet_context.planets} />
@@ -411,7 +522,6 @@ export default function ChatPage() {
                           })()
                         ) : null}
 
-                        {/* Method badge */}
                         {msg.method_used && !isLoading && (
                           <div className="mt-3">
                             <span className="rounded-full bg-accent/10 border border-accent/15 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
@@ -436,6 +546,17 @@ export default function ChatPage() {
                   method={method}
                   onMethodChange={setMethod}
                 />
+                {!subscription.loading && (
+                  <div className="mt-1 flex justify-end">
+                    <UsageIndicator
+                      used={subscription.used}
+                      limit={subscription.limit}
+                      remaining={subscription.remaining}
+                      tier={subscription.tier}
+                      resetsAt={subscription.resetsAt}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </>

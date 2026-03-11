@@ -2,12 +2,15 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import {
-  ArrowLeft, Calendar, Clock, MapPin, Briefcase, Heart, Sparkles, AlignLeft, Loader2, Trash2, AlertCircle,
+  ArrowLeft, Calendar, Clock, MapPin, Briefcase, Heart, Sparkles, AlignLeft,
+  Loader2, Trash2, AlertCircle, Crown, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/app/store";
-import { computeChart as apiComputeChart } from "@/app/api";
+import { useSubscription } from "@/app/hooks/useSubscription";
 import { UserProfile } from "@/app/types";
 
 const TONE_OPTIONS: { value: UserProfile["tone"]; label: string; description: string; icon: typeof Briefcase }[] = [
@@ -17,9 +20,19 @@ const TONE_OPTIONS: { value: UserProfile["tone"]; label: string; description: st
   { value: "concise", label: "Concise", description: "Short, direct answers — no fluff", icon: AlignLeft },
 ];
 
+const TIER_LABELS: Record<string, string> = {
+  maya: "Maya (Free)",
+  dhyan: "Dhyan ($100/mo)",
+  moksha: "Moksha ($1,000/mo)",
+};
+
 export default function SettingsPage() {
   const router = useRouter();
-  const { profile, setProfile, setChart } = useApp();
+  const { profile, sessionId } = useApp();
+  const subscription = useSubscription(sessionId);
+  const computeChartAction = useAction(api.actions.computeChart.computeChart);
+  const updateTone = useMutation(api.functions.birthProfiles.updateTone);
+  const portalUrl = useQuery(api.polar.generateCustomerPortalUrl, {});
 
   const [dob, setDob] = useState(profile?.date_of_birth ?? "");
   const [tob, setTob] = useState(profile?.time_of_birth ?? "");
@@ -32,19 +45,39 @@ export default function SettingsPage() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   async function handleUpdateChart(e: FormEvent) {
-    e.preventDefault(); setUpdating(true); setUpdateError(null); setUpdateSuccess(false);
-    const updatedProfile: UserProfile = { date_of_birth: dob, time_of_birth: tob || undefined, birthplace: birthplace.trim(), birth_time_quality: timeQuality, tone };
+    e.preventDefault();
+    setUpdating(true);
+    setUpdateError(null);
+    setUpdateSuccess(false);
+
     try {
-      const data = await apiComputeChart({ date_of_birth: updatedProfile.date_of_birth, time_of_birth: updatedProfile.time_of_birth, birthplace: updatedProfile.birthplace, birth_time_quality: updatedProfile.birth_time_quality });
-      setProfile(updatedProfile); setChart(data.chart); setUpdateSuccess(true);
+      await computeChartAction({
+        sessionId,
+        dateOfBirth: dob,
+        timeOfBirth: tob || undefined,
+        birthplace: birthplace.trim(),
+        latitude: 0,
+        longitude: 0,
+        timezone: "UTC",
+        birthTimeQuality: timeQuality,
+        tone,
+      });
+      setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
-    } catch (err) { setUpdateError(err instanceof Error ? err.message : "Failed to update chart"); }
-    finally { setUpdating(false); }
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "Failed to update chart");
+    } finally {
+      setUpdating(false);
+    }
   }
 
   function handleToneChange(newTone: UserProfile["tone"]) {
     setTone(newTone);
-    if (profile) setProfile({ ...profile, tone: newTone });
+    if (sessionId) {
+      updateTone({ sessionId, tone: newTone }).catch(() => {
+        /* silent - will sync on next load */
+      });
+    }
   }
 
   function handleClearData() {
@@ -58,6 +91,58 @@ export default function SettingsPage() {
         <Link href="/chat" className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-8"><ArrowLeft size={16} />Back to Chat</Link>
 
         <h1 className="text-2xl font-semibold text-text-primary mb-8">Settings</h1>
+
+        {/* Subscription */}
+        <section className="glass-section p-5 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Crown size={18} className="text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">Subscription</h2>
+          </div>
+          <p className="text-xs text-text-secondary mb-4">Manage your plan and billing.</p>
+
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-text-secondary">Current plan</span>
+            <span className="rounded-full bg-accent/12 px-3 py-1 text-xs font-medium text-accent">
+              {TIER_LABELS[subscription.tier] ?? subscription.tier}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-text-secondary">Queries this week</span>
+            <span className="text-sm font-medium text-text-primary">
+              {subscription.used} / {subscription.limit}
+            </span>
+          </div>
+
+          {/* Usage bar */}
+          <div className="w-full h-2 rounded-full bg-black/5 overflow-hidden mb-4">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: `${subscription.limit > 0 ? Math.min(100, (subscription.used / subscription.limit) * 100) : 0}%` }}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            {subscription.tier === "maya" && (
+              <Link
+                href="/pricing"
+                className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 transition"
+              >
+                <Sparkles size={14} /> Upgrade Plan
+              </Link>
+            )}
+            {portalUrl && subscription.tier !== "maya" && (
+              <a
+                href={portalUrl as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/20 px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-white/30 transition"
+              >
+                <ExternalLink size={14} /> Manage Billing
+              </a>
+            )}
+          </div>
+        </section>
 
         {/* Birth Details */}
         <section className="glass-section p-5 mb-6">
@@ -132,10 +217,10 @@ export default function SettingsPage() {
         <section className="glass-section p-5">
           <h2 className="text-lg font-semibold text-text-primary mb-1">Data</h2>
           <p className="text-xs text-text-secondary mb-5">Manage your local data.</p>
-          <p className="text-xs text-text-secondary/70 mb-3">This will remove your chart and all local data.</p>
+          <p className="text-xs text-text-secondary/70 mb-3">This will remove your local session data. Your Convex data remains intact.</p>
           {!confirmClear ? (
             <button type="button" onClick={() => setConfirmClear(true)} className="flex items-center gap-2 rounded-xl border border-red-400/25 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50/50 transition-colors">
-              <Trash2 size={16} />Clear All Data
+              <Trash2 size={16} />Clear Local Data
             </button>
           ) : (
             <div className="flex items-center gap-3">

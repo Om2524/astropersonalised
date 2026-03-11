@@ -1,75 +1,111 @@
 "use client";
+
 import {
   createContext,
   useContext,
   useState,
   useEffect,
   ReactNode,
+  useMemo,
 } from "react";
-import { UserProfile, CanonicalChart } from "@/app/types";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { CanonicalChart, UserProfile } from "@/app/types";
+
+const SESSION_KEY = "shastra_session_id";
 
 interface AppState {
+  sessionId: string;
   profile: UserProfile | null;
   chart: CanonicalChart | null;
-  setProfile: (p: UserProfile) => void;
-  setChart: (c: CanonicalChart) => void;
+  chartRaw: string | null;
+  tone: string;
+  ready: boolean;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-const PROFILE_KEY = "shastra_profile";
-const CHART_KEY = "shastra_chart";
-
-function loadFromStorage<T>(key: string): T | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
+function getOrGenerateSessionId(): string {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, id);
   }
-}
-
-function saveToStorage<T>(key: string, value: T | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value === null) {
-      localStorage.removeItem(key);
-    } else {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-  } catch {
-    // storage full or unavailable — silently ignore
-  }
+  return id;
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [profile, _setProfile] = useState<UserProfile | null>(null);
-  const [chart, _setChart] = useState<CanonicalChart | null>(null);
+  const [sessionId, setSessionId] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate from localStorage on mount
   useEffect(() => {
-    _setProfile(loadFromStorage<UserProfile>(PROFILE_KEY));
-    _setChart(loadFromStorage<CanonicalChart>(CHART_KEY));
+    setSessionId(getOrGenerateSessionId());
     setHydrated(true);
   }, []);
 
-  const setProfile = (p: UserProfile) => {
-    _setProfile(p);
-    saveToStorage(PROFILE_KEY, p);
-  };
+  // Fetch birth profile from Convex
+  const birthProfile = useQuery(
+    api.functions.birthProfiles.getBySession,
+    sessionId ? { sessionId } : "skip"
+  );
 
-  const setChart = (c: CanonicalChart) => {
-    _setChart(c);
-    saveToStorage(CHART_KEY, c);
-  };
+  // Fetch chart from Convex
+  const chartDoc = useQuery(
+    api.functions.charts.getBySession,
+    sessionId ? { sessionId } : "skip"
+  );
 
-  // Prevent flash of empty state before hydration
+  // Parse chart data from JSON string stored in Convex
+  const chart: CanonicalChart | null = useMemo(() => {
+    if (!chartDoc?.chartData) return null;
+    try {
+      return JSON.parse(chartDoc.chartData) as CanonicalChart;
+    } catch {
+      return null;
+    }
+  }, [chartDoc?.chartData]);
+
+  // Map birth profile to UserProfile type
+  const profile: UserProfile | null = useMemo(() => {
+    if (!birthProfile) return null;
+    return {
+      date_of_birth: birthProfile.dateOfBirth,
+      time_of_birth: birthProfile.timeOfBirth,
+      birthplace: birthProfile.birthplace,
+      birth_time_quality: birthProfile.birthTimeQuality as
+        | "exact"
+        | "approximate"
+        | "unknown",
+      tone: birthProfile.tone as
+        | "practical"
+        | "emotional"
+        | "spiritual"
+        | "concise",
+    };
+  }, [birthProfile]);
+
+  const tone = profile?.tone ?? "practical";
+
+  // Don't render until client-side hydration is complete
   if (!hydrated) return null;
 
+  const ready =
+    sessionId.length > 0 &&
+    birthProfile !== undefined &&
+    chartDoc !== undefined;
+
   return (
-    <AppContext.Provider value={{ profile, chart, setProfile, setChart }}>
+    <AppContext.Provider
+      value={{
+        sessionId,
+        profile,
+        chart,
+        chartRaw: chartDoc?.chartData ?? null,
+        tone,
+        ready,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

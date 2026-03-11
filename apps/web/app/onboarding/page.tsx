@@ -15,8 +15,9 @@ import {
   ChevronLeft,
   AlertCircle,
 } from "lucide-react";
+import { useAction, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { useApp } from "@/app/store";
-import { computeChart as apiComputeChart } from "@/app/api";
 import { UserProfile } from "@/app/types";
 
 const TONE_OPTIONS: {
@@ -35,7 +36,9 @@ const STEPS = ["Birth Details", "Preferences", "Computing"];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setProfile, setChart } = useApp();
+  const { sessionId } = useApp();
+  const computeChartAction = useAction(api.actions.computeChart.computeChart);
+  const registerSession = useMutation(api.functions.sessions.getOrCreate);
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -54,24 +57,29 @@ export default function OnboardingPage() {
     setComputing(true);
     setError(null);
 
-    const profile: UserProfile = {
-      date_of_birth: dob,
-      time_of_birth: unknownTime ? undefined : tob || undefined,
-      birthplace: birthplace.trim(),
-      birth_time_quality: unknownTime ? timeQuality : "exact",
-      tone,
-    };
-
-    setProfile(profile);
+    const birthTimeQuality = unknownTime ? timeQuality : "exact";
+    const timeOfBirth = unknownTime ? undefined : tob || undefined;
 
     try {
-      const data = await apiComputeChart({
-        date_of_birth: profile.date_of_birth,
-        time_of_birth: profile.time_of_birth,
-        birthplace: profile.birthplace,
-        birth_time_quality: profile.birth_time_quality,
+      // Ensure session is registered
+      await registerSession({ sessionId });
+
+      // Call Convex action — this computes the chart via the Python API
+      // and stores both the birth profile and chart in Convex
+      await computeChartAction({
+        sessionId,
+        dateOfBirth: dob,
+        timeOfBirth,
+        birthplace: birthplace.trim(),
+        // Geocoding is done by the Python API, so we pass placeholder coords
+        // The action handles lat/lng/timezone from the compute response
+        latitude: 0,
+        longitude: 0,
+        timezone: "UTC",
+        birthTimeQuality,
+        tone,
       });
-      setChart(data.chart);
+
       router.push("/chat");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";

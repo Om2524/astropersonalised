@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { useApp } from "@/app/store";
-import { getDailyBrief } from "@/app/api";
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
@@ -25,23 +26,28 @@ function addDays(dateStr: string, days: number) {
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 
 export default function DailyBriefPage() {
-  const { chart } = useApp();
+  const { chart, chartRaw, tone } = useApp();
+  const dailyBriefAction = useAction(api.actions.dailyBrief.dailyBrief);
+
   const [date, setDate] = useState(todayStr());
   const [brief, setBrief] = useState<DailyBriefData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchBrief = useCallback(async (targetDate: string) => {
-    if (!chart) return;
+    if (!chartRaw) return;
     setLoading(true); setError(null);
     try {
-      const data = await getDailyBrief(chart as unknown as Record<string, unknown>, targetDate);
-      setBrief(data);
+      const data = await dailyBriefAction({
+        chartData: chartRaw,
+        tone: tone || "practical",
+      });
+      setBrief(data as DailyBriefData);
     } catch (err) { setError((err as Error).message || "Failed to load daily brief"); }
     finally { setLoading(false); }
-  }, [chart]);
+  }, [chartRaw, tone, dailyBriefAction]);
 
-  useEffect(() => { if (chart) fetchBrief(date); }, [chart, date, fetchBrief]);
+  useEffect(() => { if (chartRaw) fetchBrief(date); }, [chartRaw, date, fetchBrief]);
 
   if (!chart) {
     return (

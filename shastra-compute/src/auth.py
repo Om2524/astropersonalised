@@ -7,7 +7,12 @@ Two mechanisms are supported:
 
 2. **Stream Token** -- short-lived HMAC-signed tokens for SSE streaming
    endpoints.  The Convex backend mints these; the compute service verifies
-   them.  Token format: ``base64(json_payload).hex_signature``.
+   them.  Token format: ``base64url(json_payload).base64url(hmac_signature)``.
+
+   The Convex ``authorizeStream`` action:
+   - Signs the **raw JSON payload string** with HMAC-SHA256
+   - Encodes both payload and signature as **base64url** (RFC 4648 §5)
+   - Timestamps (``queriedAt``, ``exp``) are in **milliseconds** (JS Date.now())
 """
 
 from __future__ import annotations
@@ -22,6 +27,19 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, status
 
 from src.config import settings
+
+
+def _base64url_decode(s: str) -> bytes:
+    """Decode a base64url string (RFC 4648 §5) to bytes.
+
+    Handles missing padding and the URL-safe alphabet (``-`` and ``_``
+    instead of ``+`` and ``/``).
+    """
+    # Add padding if needed
+    s += "=" * (-len(s) % 4)
+    # Convert base64url to standard base64
+    s = s.replace("-", "+").replace("_", "/")
+    return base64.b64decode(s)
 
 
 async def verify_api_key(
@@ -51,19 +69,20 @@ async def verify_stream_token(
 
     Expected header value::
 
-        Bearer <base64(json_payload)>.<hex_signature>
+        Bearer <base64url(json_payload)>.<base64url(hmac_sha256_signature)>
+
+    The Convex ``authorizeStream`` action signs the **raw JSON payload
+    string** (before base64url encoding) with HMAC-SHA256, then encodes
+    both payload and signature as base64url.
 
     Payload schema::
 
         {
             "sessionId": str,
             "userId": str | null,
-            "queriedAt": int,   # unix epoch seconds
-            "exp": int          # unix epoch seconds
+            "queriedAt": int,   # milliseconds (JS Date.now())
+            "exp": int          # milliseconds (JS Date.now() + 60_000)
         }
-
-    The signature is HMAC-SHA256 over the raw base64 segment, keyed by
-    ``settings.stream_token_secret``.  Tokens are valid for 60 seconds.
 
     Returns the decoded payload dict on success; raises 401 otherwise.
     """
@@ -87,34 +106,55 @@ async def verify_stream_token(
             detail="Malformed stream token",
         )
 
-    payload_b64, provided_sig = parts
+    payload_b64url, sig_b64url = parts
 
-    # Verify HMAC signature
-    expected_sig = hmac.new(
-        settings.stream_token_secret.encode(),
-        payload_b64.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-
-    if not hmac.compare_digest(provided_sig, expected_sig):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid stream token signature",
-        )
-
-    # Decode payload
+    # 1. Decode the base64url payload to get the raw JSON string
+    #    (this is what Convex signed with HMAC-SHA256)
     try:
-        payload_bytes = base64.b64decode(payload_b64)
-        payload: dict = json.loads(payload_bytes)
+        payload_bytes = _base64url_decode(payload_b64url)
+        payload_json = payload_bytes.decode("utf-8")
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not decode stream token payload",
         )
 
-    # Check expiry (60 second window)
+    # 2. Compute expected HMAC-SHA256 over the raw JSON string
+    expected_sig = hmac.new(
+        settings.stream_token_secret.encode(),
+        payload_json.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+
+    # 3. Decode the provided signature from base64url
+    try:
+        provided_sig = _base64url_decode(sig_b64url)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not decode stream token signature",
+        )
+
+    # 4. Constant-time comparison of signature bytes
+    if not hmac.compare_digest(expected_sig, provided_sig):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid stream token signature",
+        )
+
+    # 5. Parse the JSON payload
+    try:
+        payload: dict = json.loads(payload_json)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not parse stream token payload",
+        )
+
+    # 6. Check expiry — Convex timestamps are in MILLISECONDS
     exp = payload.get("exp")
-    if exp is None or time.time() > exp:
+    now_ms = time.time() * 1000
+    if exp is None or now_ms > exp:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Stream token expired",

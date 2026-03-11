@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { useApp } from "@/app/store";
-import { getWeeklyOutlook } from "@/app/api";
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { useSubscription } from "@/app/hooks/useSubscription";
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Lock } from "lucide-react";
 import Link from "next/link";
 
 interface DayOutlook { day_name: string; date: string; highlight: string; rating: number; }
@@ -35,21 +37,32 @@ function ratingDots(rating: number) {
 }
 
 export default function WeeklyOutlookPage() {
-  const { chart } = useApp();
+  const { chart, chartRaw, tone, sessionId } = useApp();
+  const subscription = useSubscription(sessionId);
+  const weeklyOutlookAction = useAction(api.actions.weeklyOutlook.weeklyOutlook);
+
   const [weekStart, setWeekStart] = useState(currentWeekStart());
   const [outlook, setOutlook] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchOutlook = useCallback(async (ws: string) => {
-    if (!chart) return;
+    if (!chartRaw) return;
     setLoading(true); setError(null);
-    try { const data = await getWeeklyOutlook(chart as unknown as Record<string, unknown>, ws); setOutlook(data); }
+    try {
+      const data = await weeklyOutlookAction({
+        chartData: chartRaw,
+        tone: tone || "practical",
+      });
+      setOutlook(data as WeeklyData);
+    }
     catch (err) { setError((err as Error).message || "Failed to load weekly outlook"); }
     finally { setLoading(false); }
-  }, [chart]);
+  }, [chartRaw, tone, weeklyOutlookAction]);
 
-  useEffect(() => { if (chart) fetchOutlook(weekStart); }, [chart, weekStart, fetchOutlook]);
+  useEffect(() => {
+    if (chartRaw && subscription.canWeekly) fetchOutlook(weekStart);
+  }, [chartRaw, weekStart, fetchOutlook, subscription.canWeekly]);
 
   if (!chart) {
     return (
@@ -58,6 +71,24 @@ export default function WeeklyOutlookPage() {
           <h2 className="mb-2 text-xl font-semibold text-text-primary">No chart found</h2>
           <p className="mb-6 text-sm text-text-secondary">Complete onboarding first.</p>
           <Link href="/onboarding" className="inline-block rounded-xl bg-accent px-6 py-2.5 text-sm font-medium text-white hover:brightness-110">Go to Onboarding</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Gate behind Dhyan/Moksha tier
+  if (!subscription.loading && !subscription.canWeekly) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-4">
+        <div className="max-w-md glass-section p-8 text-center">
+          <Lock className="mx-auto h-12 w-12 text-text-secondary/30 mb-4" />
+          <h2 className="mb-2 text-xl font-semibold text-text-primary">Weekly Outlook</h2>
+          <p className="mb-6 text-sm text-text-secondary">
+            Weekly outlook is available on Dhyan and Moksha plans.
+          </p>
+          <Link href="/pricing" className="inline-block rounded-xl bg-accent px-6 py-2.5 text-sm font-medium text-white hover:brightness-110">
+            View Plans
+          </Link>
         </div>
       </div>
     );

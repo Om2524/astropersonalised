@@ -106,8 +106,8 @@ export default function ChartPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-accent">Chart Summary</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <SummaryItem label="Ascendant" value={`${ascInfo.sign} ${formatDegree(ascInfo.degree)}`} />
-            <SummaryItem label="Sun Sign" value={sun ? sun.sign : "—"} sub={sun?.nakshatra} />
-            <SummaryItem label="Moon Sign" value={moon ? moon.sign : "—"} sub={moon?.nakshatra} />
+            <SummaryItem label="Sun Sign" value={sun ? sun.sign : "\u2014"} sub={sun?.nakshatra} />
+            <SummaryItem label="Moon Sign" value={moon ? moon.sign : "\u2014"} sub={moon?.nakshatra} />
             {chart.vimshottari_dasha && <SummaryItem label="Current Dasha" value={`${chart.vimshottari_dasha.maha_lord} Maha`} sub={chart.vimshottari_dasha.antar_lord ? `${chart.vimshottari_dasha.antar_lord} Antar` : undefined} />}
             <SummaryItem label="Ayanamsa" value={`${chart.ayanamsa.toFixed(4)}\u00B0`} />
           </div>
@@ -130,8 +130,8 @@ export default function ChartPage() {
                     <td className="py-2 pr-3"><span className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PLANET_COLORS[p.name] ?? "#888" }} />{p.name}</span></td>
                     <td className="py-2 pr-3 text-text-secondary">{p.sign}</td>
                     <td className="py-2 pr-3 font-mono text-xs text-text-secondary">{formatDegree(p.sign_degree)}</td>
-                    <td className="py-2 pr-3 text-text-secondary">{p.nakshatra ? `${p.nakshatra}${p.nakshatra_pada != null ? ` P${p.nakshatra_pada}` : ""}` : "—"}</td>
-                    <td className="py-2 pr-3 text-text-secondary">{p.house ?? "—"}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{p.nakshatra ? `${p.nakshatra}${p.nakshatra_pada != null ? ` P${p.nakshatra_pada}` : ""}` : "\u2014"}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{p.house ?? "\u2014"}</td>
                     <td className="py-2">{p.retrograde && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-xs font-medium text-red-600">R</span>}</td>
                   </tr>
                 ))}
