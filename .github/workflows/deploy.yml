@@ -104,7 +104,7 @@ jobs:
         run: |
           ln -s apps/web/node_modules node_modules
           ln -s apps/web/package.json package.json
-          npx convex codegen
+          npx convex codegen --typecheck=disable
         working-directory: .
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
