@@ -17,6 +17,8 @@ export default {
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      // Convex Auth handles OIDC issuer discovery internally
+      issuer: undefined,
     }),
     Resend({
       from: "Sudarshan <auth@forsee.life>",
