@@ -100,6 +100,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Convex types
+        run: |
+          ln -s apps/web/node_modules node_modules
+          ln -s apps/web/package.json package.json
+          npx convex codegen
+        working-directory: .
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
         env:
