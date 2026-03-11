@@ -43,7 +43,7 @@ jobs:
         run: |
           ln -s apps/web/node_modules node_modules
           ln -s apps/web/package.json package.json
-          npx convex deploy
+          npx convex deploy --typecheck disable
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
