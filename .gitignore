@@ -39,6 +39,17 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 
+# Convex
+apps/web/convex/_generated/
+
+# Cloudflare
+apps/web/.open-next/
+
+# Claude
+.claude-commit-validation.txt
+.claude-session
+.claude/
+
 # Misc
 *.log
 *.pid
