@@ -1,11 +1,17 @@
+"use node";
+import Google from "@auth/core/providers/google";
+import Resend from "@auth/core/providers/resend";
 import { convexAuth } from "@convex-dev/auth/server";
-import authConfig from "./auth.config";
 
-/**
- * Convex Auth setup for Sudarshan.
- *
- * Exports auth helpers (signIn, signOut, store) and
- * the getAuthUserId / getAuthSessionId utilities for
- * use in queries and mutations.
- */
-export const { auth, signIn, signOut, store } = convexAuth(authConfig);
+export const { auth, signIn, signOut, store } = convexAuth({
+  providers: [
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+    Resend({
+      from: "Sudarshan <auth@forsee.life>",
+      apiKey: process.env.AUTH_RESEND_KEY,
+    }),
+  ],
+});
