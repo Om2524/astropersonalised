@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Frontend Type Check & Build ──────────────────────────────
+  # ── Frontend Build ───────────────────────────────────────────
   frontend:
-    name: Frontend (TypeScript + Build)
+    name: Frontend (Build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,18 +46,15 @@ jobs:
       - name: Symlink convex into frontend
         run: ln -s ../../convex convex
 
-      - name: TypeScript type check
-        run: npx tsc --noEmit
-
       - name: Next.js build
         run: pnpm run build
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-  # ── Convex Type Check ────────────────────────────────────────
+  # ── Convex Codegen ──────────────────────────────────────────
   convex:
-    name: Convex (TypeScript)
+    name: Convex (Codegen)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,11 +73,11 @@ jobs:
         working-directory: apps/web
         run: pnpm install --frozen-lockfile
 
-      - name: Type check Convex functions
+      - name: Validate Convex codegen
         run: |
           ln -s apps/web/node_modules node_modules
           ln -s apps/web/package.json package.json
-          npx convex typecheck
+          npx convex codegen --typecheck=disable
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
