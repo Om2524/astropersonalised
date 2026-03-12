@@ -3,7 +3,7 @@
   "name": "forsee-life",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-07",
-  "compatibility_flags": ["nodejs_compat_v2"],
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
