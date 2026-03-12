@@ -2,8 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "forsee-life",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-07",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2025-08-14",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "enable_nodejs_http_modules"
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
