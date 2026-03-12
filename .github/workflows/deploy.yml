@@ -68,25 +68,22 @@ jobs:
       - name: Diagnose Cloudflare auth and account access
         working-directory: shastra-compute
         run: |
-          echo "Verifying Cloudflare API token"
-          curl --fail --silent --show-error \
-            https://api.cloudflare.com/client/v4/user/tokens/verify \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json"
-          echo
-          echo "Inspecting Wrangler account access"
+          echo "Inspecting Wrangler account access (non-blocking)"
+          set +e
           npx wrangler whoami --account "${CLOUDFLARE_ACCOUNT_ID}"
-          echo
-          echo "Cloudflare Containers are only available on the Workers Paid plan."
+          STATUS=$?
+          set -e
+          echo "wrangler whoami exit code: ${STATUS}"
+          echo "Continuing to deploy so the job surfaces the real Cloudflare error."
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_COMPUTE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Containers
         working-directory: shastra-compute
         run: npx wrangler deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_COMPUTE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   # ── Frontend (Cloudflare Pages) ─────────────────────────────
