@@ -7,22 +7,29 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config, { isServer, webpack: wp }) => {
+  webpack: (config, { isServer }) => {
     if (isServer) {
-      // Replace 'https' and 'node:https' with our http shim.
-      // NormalModuleReplacementPlugin fires in beforeResolve (before the
-      // externals check in factorize), so it rewrites the request from
-      // "https" → shim path, preventing webpack from externalizing it.
       const shimPath = path.resolve(__dirname, "node-https-shim.cjs");
-      config.plugins.push(
-        new wp.NormalModuleReplacementPlugin(
-          /^(node:)?https$/,
-          shimPath
-        )
-      );
 
-      // Belt-and-suspenders: resolve.alias catches any requests that
-      // slip past the plugin (e.g. different compilation phases).
+      // ── Prevent webpack from externalizing 'https' ──
+      // Webpack's ExternalModuleFactoryPlugin reads dependency.request
+      // (not data.request), so NormalModuleReplacementPlugin can't help.
+      // Instead, wrap every externals function to pass-through on 'https'
+      // so webpack falls through to normal resolution via resolve.alias.
+      const orig = config.externals;
+      const arr: any[] = Array.isArray(orig) ? orig : orig ? [orig] : [];
+      config.externals = arr.map((ext: any) => {
+        if (typeof ext !== "function") return ext;
+        return function (ctx: any, cb: any) {
+          const req = typeof ctx === "string" ? ctx : ctx?.request;
+          if (req === "https" || req === "node:https") {
+            return typeof cb === "function" ? cb() : undefined;
+          }
+          return ext(ctx, cb);
+        };
+      });
+
+      // ── Point 'https' at our http shim ──
       config.resolve = config.resolve || {};
       config.resolve.alias = {
         ...config.resolve.alias,
