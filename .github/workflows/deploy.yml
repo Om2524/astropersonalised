@@ -118,22 +118,16 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Bundle worker
-        run: npx wrangler deploy --dry-run --outdir .open-next/bundled
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Patch bundled worker (https → http)
+      - name: Patch worker source (https → http in webpack module map)
         run: |
           echo "Before patch:"
-          grep -c '("https")' .open-next/bundled/worker.js || echo "  0 matches"
-          sed -i 's/("https")/("http")/g' .open-next/bundled/worker.js
+          grep -c '("https")' .open-next/worker.js || echo "  0 matches"
+          sed -i 's/("https")/("http")/g' .open-next/worker.js
           echo "After patch:"
-          grep -c '("https")' .open-next/bundled/worker.js || echo "  0 remaining"
+          grep -c '("https")' .open-next/worker.js || echo "  0 remaining"
 
-      - name: Deploy patched worker
-        run: npx wrangler deploy --no-bundle --x-autoconfig=false .open-next/bundled/worker.js
+      - name: Deploy (wrangler + esbuild will resolve node polyfills)
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
