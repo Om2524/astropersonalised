@@ -8,6 +8,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Rewrite node:https → node:http at bundle time.
+  // compat_date 2025-03-07 doesn't provide node:https, and bumping to
+  // 2025-08-15 breaks OpenNext's IncomingMessage extends. Workers use
+  // fetch() internally so http vs https is irrelevant at runtime.
+  "alias": {
+    "node:https": "node:http",
+    "https": "http"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
