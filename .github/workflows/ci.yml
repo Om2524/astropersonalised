@@ -1,0 +1,108 @@
+name: CI Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Frontend Type Check & Build ──────────────────────────────
+  frontend:
+    name: Frontend (TypeScript + Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Convex types
+        run: |
+          ln -s apps/web/node_modules node_modules
+          ln -s apps/web/package.json package.json
+          npx convex codegen --typecheck=disable
+        working-directory: .
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      - name: Symlink convex into frontend
+        run: ln -s ../../convex convex
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Next.js build
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
+
+  # ── Convex Type Check ────────────────────────────────────────
+  convex:
+    name: Convex (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check Convex functions
+        run: |
+          ln -s apps/web/node_modules node_modules
+          ln -s apps/web/package.json package.json
+          npx convex typecheck
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+  # ── Shastra Compute (Docker Build) ──────────────────────────
+  compute:
+    name: Compute (Docker Build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: shastra-compute
+        run: docker build -t shastra-compute:test .
+
+      - name: Smoke test — container starts
+        run: |
+          docker run -d --name smoke -p 8000:8000 \
+            -e API_KEY=test -e STREAM_TOKEN_SECRET=test -e GEMINI_API_KEY=test \
+            shastra-compute:test
+          sleep 5
+          STATUS=$(docker inspect --format='{{.State.Running}}' smoke)
+          echo "Container running: $STATUS"
+          docker logs smoke 2>&1 | tail -20
+          docker stop smoke
+          [ "$STATUS" = "true" ] || exit 1

@@ -124,10 +124,10 @@ jobs:
           # it breaks OpenNext's IncomingMessage extends. Patch ALL .js files
           # to use node:http polyfill instead — Workers use fetch() internally
           # so the actual HTTP client is irrelevant.
-          find .open-next -name '*.js' -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
-          find .open-next -name '*.js' -exec sed -i "s|require('node:https')|require('node:http')|g" {} +
-          find .open-next -name '*.js' -exec sed -i 's|from "node:https"|from "node:http"|g' {} +
-          find .open-next -name '*.js' -exec sed -i "s|from 'node:https'|from 'node:http'|g" {} +
+          find .open-next -type f -name '*.js' -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
+          find .open-next -type f -name '*.js' -exec sed -i "s|require('node:https')|require('node:http')|g" {} +
+          find .open-next -type f -name '*.js' -exec sed -i 's|from "node:https"|from "node:http"|g' {} +
+          find .open-next -type f -name '*.js' -exec sed -i "s|from 'node:https'|from 'node:http'|g" {} +
           echo "Patched node:https references:"
           grep -r "node:https" .open-next/ --include='*.js' -l || echo "  (none remaining — all patched)"
 
