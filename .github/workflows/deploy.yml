@@ -146,7 +146,14 @@ jobs:
               outfile: '.open-next/worker.bundled.js',
               platform: 'neutral',
               conditions: ['workerd', 'worker', 'import', 'require'],
-              external: ['node:*', 'cloudflare:*'],
+              external: [
+                'node:*', 'cloudflare:*',
+                // Bare builtins created by sed patches (Workers resolves to node:*)
+                'http', 'https', 'crypto', 'stream', 'events', 'net', 'tls',
+                'url', 'path', 'fs', 'util', 'buffer', 'zlib', 'os',
+                'assert', 'string_decoder', 'querystring', 'child_process',
+                'worker_threads', 'perf_hooks', 'async_hooks', 'diagnostics_channel'
+              ],
               logLevel: 'warning'
             });
           "
