@@ -8,15 +8,11 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Skip esbuild re-bundling so sed patches on node:https persist.
-  // The .open-next output is already fully bundled by opennextjs-cloudflare.
+  // Deploy the pre-bundled worker without wrangler re-bundling.
+  // The deploy workflow builds → patches node:https → re-bundles with
+  // esbuild into a single file → deploys with no_bundle to skip
+  // wrangler's own esbuild pass that would undo the patches.
   "no_bundle": true,
-  "find_additional_modules": true,
-  // Rules tell wrangler how to handle discovered modules
-  "rules": [
-    { "type": "ESModule", "globs": ["**/*.mjs"] },
-    { "type": "CommonJS", "globs": ["**/*.cjs", "**/*.js"] }
-  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

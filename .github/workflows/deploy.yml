@@ -118,11 +118,11 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Patch node:https → node:http in build output
+      - name: Patch node:https → node:http and re-bundle
         run: |
           # compat_date 2025-03-07 doesn't provide node:https, and bumping
-          # breaks OpenNext IncomingMessage. Patch all require/import variants.
-          # With no_bundle in wrangler.jsonc, these patches persist to deploy.
+          # breaks OpenNext IncomingMessage. Patch all require/import variants
+          # including webpack-wrapped p("https") calls that esbuild can't trace.
           find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
             -exec sed -i 's|require("node:https")|require("node:http")|g' {} + \
             -exec sed -i "s|require('node:https')|require('node:http')|g" {} + \
@@ -130,12 +130,20 @@ jobs:
             -exec sed -i "s|require('https')|require('http')|g" {} + \
             -exec sed -i 's|from "node:https"|from "node:http"|g' {} + \
             -exec sed -i "s|from 'node:https'|from 'node:http'|g" {} +
-          # Also patch the webpack require wrappers: p("https") → p("http")
           find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
             -exec sed -i 's|p("https")|p("http")|g' {} + \
             -exec sed -i "s|p('https')|p('http')|g" {} +
-          echo "Remaining https module references:"
-          grep -rn 'require("https")\|require("node:https")\|p("https")' .open-next/ --include='*.js' --include='*.mjs' || echo "  (none — all patched)"
+          # Re-bundle patched source into a single worker file.
+          # This replaces the multi-file .open-next output with one file
+          # so wrangler can deploy it with no_bundle (skipping its own esbuild).
+          npx esbuild .open-next/worker.js --bundle --format=esm \
+            --outfile=.open-next/worker.bundled.js \
+            --platform=neutral \
+            --conditions=workerd,worker,import,require \
+            --external:node:* --external:cloudflare:*
+          mv .open-next/worker.bundled.js .open-next/worker.js
+          echo "Remaining https module references in final bundle:"
+          grep -c 'require("https")\|require("node:https")\|p("https")' .open-next/worker.js || echo "  (none — all patched)"
 
       - name: Deploy to Cloudflare
         run: pnpm exec wrangler deploy
