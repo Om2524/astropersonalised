@@ -136,7 +136,7 @@ jobs:
           # Re-bundle patched source into a single worker file.
           # This replaces the multi-file .open-next output with one file
           # so wrangler can deploy it with no_bundle (skipping its own esbuild).
-          pnpm exec esbuild .open-next/worker.js --bundle --format=esm \
+          npx --yes esbuild .open-next/worker.js --bundle --format=esm \
             --outfile=.open-next/worker.bundled.js \
             --platform=neutral \
             --conditions=workerd,worker,import,require \
