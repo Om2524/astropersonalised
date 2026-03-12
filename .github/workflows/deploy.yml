@@ -118,22 +118,6 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Patch worker bundle (https → http for Workers runtime)
-        run: |
-          # Workers (compat_date 2025-03-07) lack node:https. The webpack-
-          # bundled code may be in any .js file under .open-next/.
-          echo "=== Files containing https requires ==="
-          grep -rlE '[a-z]\("https"\)' .open-next/ || echo "  (none found in .open-next/)"
-          echo "=== Patterns found ==="
-          grep -rhoE '[a-z]\("https"\)' .open-next/ | sort | uniq -c || echo "  (none)"
-          echo "=== Patching all .js/.mjs files ==="
-          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) -exec sed -i -E \
-            's/require\("https"\)/require("http")/g; s/require\("node:https"\)/require("node:http")/g' {} +
-          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) -exec sed -i -E \
-            's/([^a-zA-Z])([a-z])\("https"\)/\1\2("http")/g; s/([^a-zA-Z])([a-z])\("node:https"\)/\1\2("node:http")/g' {} +
-          echo "=== After patch ==="
-          grep -rhoE '[a-z]\("https"\)' .open-next/ | sort | uniq -c || echo "  0 remaining https requires"
-
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy
         env:
