@@ -14,7 +14,7 @@
   // fetch() internally so http vs https is irrelevant at runtime.
   "alias": {
     "node:https": "node:http",
-    "https": "http"
+    "https": "node:http"
   },
   "observability": {
     "enabled": true,
