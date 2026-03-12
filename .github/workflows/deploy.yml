@@ -118,13 +118,13 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Patch worker source (https → http in webpack module map)
+      - name: Patch OpenNext output (https → http in webpack module map)
         run: |
           echo "Before patch:"
-          grep -c '("https")' .open-next/worker.js || echo "  0 matches"
-          sed -i 's/("https")/("http")/g' .open-next/worker.js
+          find .open-next -name '*.js' -type f | xargs grep -l '("https")' || echo "  (no files match)"
+          find .open-next -name '*.js' -type f -exec sed -i 's/("https")/("http")/g' {} +
           echo "After patch:"
-          grep -c '("https")' .open-next/worker.js || echo "  0 remaining"
+          find .open-next -name '*.js' -type f | xargs grep -l '("https")' || echo "  0 remaining"
 
       - name: Deploy (wrangler + esbuild will resolve node polyfills)
         run: npx wrangler deploy
