@@ -118,16 +118,23 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Patch OpenNext output (https → http in webpack module map)
+      - name: Bundle worker (esbuild resolves node polyfills + aliases)
+        run: npx wrangler deploy --dry-run --outdir .open-next/bundled
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Patch bundled worker (webpack require "https" → "http")
         run: |
           echo "Before patch:"
-          find .open-next -name '*.js' -type f | xargs grep -l '("https")' || echo "  (no files match)"
-          find .open-next -name '*.js' -type f -exec sed -i 's/("https")/("http")/g' {} +
+          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  (none)"
+          # Protect non-module uses like includes("https"), then patch, then restore
+          sed -i 's/includes("https")/includes("HTTPS_KEEP")/g; s/("https")/("http")/g; s/includes("HTTPS_KEEP")/includes("https")/g' .open-next/bundled/worker.js
           echo "After patch:"
-          find .open-next -name '*.js' -type f | xargs grep -l '("https")' || echo "  0 remaining"
+          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  0 remaining"
 
-      - name: Deploy (wrangler + esbuild will resolve node polyfills)
-        run: npx wrangler deploy
+      - name: Deploy patched bundle (esbuild re-resolves externals)
+        run: npx wrangler deploy --x-autoconfig=false .open-next/bundled/worker.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
