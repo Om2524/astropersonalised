@@ -118,6 +118,16 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
+      - name: Patch node:https out of server bundle
+        run: |
+          # Next.js font fetcher requires node:https at runtime which doesn't
+          # exist on Cloudflare Workers with compat_date < 2025-08-15.
+          # Enabling enable_nodejs_http_modules breaks OpenNext's IncomingMessage.
+          # Workaround: replace require("node:https") with require("node:http")
+          # which IS available as a polyfill. Font fetching won't work but the
+          # app won't crash — fonts fall back to system fonts.
+          find .open-next -name "fetch-resource.js" -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
+
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy
         env:
