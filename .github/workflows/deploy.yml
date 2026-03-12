@@ -118,8 +118,22 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Deploy to Cloudflare
-        run: pnpm exec opennextjs-cloudflare deploy
+      - name: Bundle worker
+        run: npx wrangler deploy --dry-run --outdir .open-next/bundled
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Patch bundled worker (https → http)
+        run: |
+          echo "Before patch:"
+          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  (none)"
+          sed -i -E 's/([^a-zA-Z])([a-z])\("https"\)/\1\2("http")/g' .open-next/bundled/worker.js
+          echo "After patch:"
+          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  0 remaining"
+
+      - name: Deploy patched worker
+        run: npx wrangler deploy --no-bundle --main .open-next/bundled/worker.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
