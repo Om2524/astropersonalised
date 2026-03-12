@@ -3,19 +3,10 @@
   "name": "forsee-life",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-07",
-  "compatibility_flags": ["nodejs_compat", "nodejs_compat_v2"],
+  "compatibility_flags": ["nodejs_compat_v2"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
-  },
-  // Redirect https → http at bundle time via a physical shim file.
-  // compat_date 2025-03-07 doesn't provide node:https, and bumping to
-  // 2025-08-15 breaks OpenNext's IncomingMessage extends. The shim
-  // re-exports node:http which is available. Workers use fetch()
-  // internally so http vs https is functionally identical.
-  "alias": {
-    "https": "./node-https-shim.cjs",
-    "node:https": "./node-https-shim.cjs"
   },
   "observability": {
     "enabled": true,
