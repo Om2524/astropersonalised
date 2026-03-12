@@ -127,13 +127,13 @@ jobs:
       - name: Patch bundled worker (https → http)
         run: |
           echo "Before patch:"
-          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  (none)"
-          sed -i -E 's/([^a-zA-Z])([a-z])\("https"\)/\1\2("http")/g' .open-next/bundled/worker.js
+          grep -c '("https")' .open-next/bundled/worker.js || echo "  0 matches"
+          sed -i 's/("https")/("http")/g' .open-next/bundled/worker.js
           echo "After patch:"
-          grep -oE '[a-z]\("https"\)' .open-next/bundled/worker.js | sort | uniq -c || echo "  0 remaining"
+          grep -c '("https")' .open-next/bundled/worker.js || echo "  0 remaining"
 
       - name: Deploy patched worker
-        run: npx wrangler deploy --no-bundle --main .open-next/bundled/worker.js
+        run: npx wrangler deploy --no-bundle .open-next/bundled/worker.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
