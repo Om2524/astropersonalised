@@ -118,6 +118,14 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
+      - name: Patch worker bundle (https → http for Workers runtime)
+        run: |
+          # Workers (compat_date 2025-03-07) lack node:https. Webpack
+          # externalizes Node builtins so resolve.alias can't reach them.
+          # This patches the bundled ws library's require("https") calls.
+          sed -i 's/p("https")/p("http")/g; s/p("node:https")/p("node:http")/g' .open-next/worker.js
+          echo "Patched $(grep -c 'p("http")' .open-next/worker.js) http require calls in worker.js"
+
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy
         env:
