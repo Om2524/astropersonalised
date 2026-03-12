@@ -1,10 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "forsee-life",
+  "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-07",
   "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": ".open-next",
-
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
