@@ -8,11 +8,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Deploy the pre-bundled worker without wrangler re-bundling.
-  // The deploy workflow builds → patches node:https → re-bundles with
-  // esbuild into a single file → deploys with no_bundle to skip
-  // wrangler's own esbuild pass that would undo the patches.
-  "no_bundle": true,
+  // Redirect https → http at bundle time via a physical shim file.
+  // compat_date 2025-03-07 doesn't provide node:https, and bumping to
+  // 2025-08-15 breaks OpenNext's IncomingMessage extends. The shim
+  // re-exports node:http which is available. Workers use fetch()
+  // internally so http vs https is functionally identical.
+  "alias": {
+    "https": "./node-https-shim.cjs",
+    "node:https": "./node-https-shim.cjs"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
