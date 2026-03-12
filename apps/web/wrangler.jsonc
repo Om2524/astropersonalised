@@ -8,15 +8,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Redirect https → http at bundle time via a physical shim file.
-  // compat_date 2025-03-07 doesn't provide node:https, and bumping to
-  // 2025-08-15 breaks OpenNext's IncomingMessage extends. The shim
-  // re-exports node:http which is available. Workers use fetch()
-  // internally so http vs https is functionally identical.
-  "alias": {
-    "https": "./node-https-shim.cjs",
-    "node:https": "./node-https-shim.cjs"
-  },
+  // Skip esbuild re-bundling so sed patches on node:https persist.
+  // The .open-next output is already fully bundled by opennextjs-cloudflare.
+  "no_bundle": true,
+  "find_additional_modules": true,
+  // Rules tell wrangler how to handle discovered modules
+  "rules": [
+    { "type": "ESModule", "globs": ["**/*.mjs"] },
+    { "type": "CommonJS", "globs": ["**/*.cjs", "**/*.js"] }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
