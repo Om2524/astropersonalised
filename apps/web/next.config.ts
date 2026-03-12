@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import path from "path";
-import webpack from "webpack";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -8,19 +7,28 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack: wp }) => {
     if (isServer) {
       // Replace 'https' and 'node:https' with our http shim.
-      // NormalModuleReplacementPlugin intercepts BEFORE externals check,
-      // so webpack bundles the shim instead of externalizing to node:https
-      // (which doesn't exist on Cloudflare Workers).
+      // NormalModuleReplacementPlugin fires in beforeResolve (before the
+      // externals check in factorize), so it rewrites the request from
+      // "https" → shim path, preventing webpack from externalizing it.
       const shimPath = path.resolve(__dirname, "node-https-shim.cjs");
       config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
+        new wp.NormalModuleReplacementPlugin(
           /^(node:)?https$/,
           shimPath
         )
       );
+
+      // Belt-and-suspenders: resolve.alias catches any requests that
+      // slip past the plugin (e.g. different compilation phases).
+      config.resolve = config.resolve || {};
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        https: shimPath,
+        "node:https": shimPath,
+      };
     }
     return config;
   },
