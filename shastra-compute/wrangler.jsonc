@@ -4,6 +4,12 @@
   "main": "worker.ts",
   "compatibility_date": "2025-03-07",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "api.forsee.life",
+      "custom_domain": true
+    }
+  ],
 
   "observability": {
     "enabled": true,

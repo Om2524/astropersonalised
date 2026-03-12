@@ -65,6 +65,23 @@ jobs:
         working-directory: shastra-compute
         run: npm install
 
+      - name: Diagnose Cloudflare auth and account access
+        working-directory: shastra-compute
+        run: |
+          echo "Verifying Cloudflare API token"
+          curl --fail --silent --show-error \
+            https://api.cloudflare.com/client/v4/user/tokens/verify \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json"
+          echo
+          echo "Inspecting Wrangler account access"
+          npx wrangler whoami --account "${CLOUDFLARE_ACCOUNT_ID}"
+          echo
+          echo "Cloudflare Containers are only available on the Workers Paid plan."
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Deploy to Cloudflare Containers
         working-directory: shastra-compute
         run: npx wrangler deploy
