@@ -8,6 +8,10 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "alias": {
+    "https": "./node-https-shim.cjs",
+    "node:https": "./node-https-shim.cjs"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
