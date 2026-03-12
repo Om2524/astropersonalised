@@ -65,20 +65,6 @@ jobs:
         working-directory: shastra-compute
         run: npm install
 
-      - name: Diagnose Cloudflare auth and account access
-        working-directory: shastra-compute
-        run: |
-          echo "Inspecting Wrangler account access (non-blocking)"
-          set +e
-          npx wrangler whoami --account "${CLOUDFLARE_ACCOUNT_ID}"
-          STATUS=$?
-          set -e
-          echo "wrangler whoami exit code: ${STATUS}"
-          echo "Continuing to deploy so the job surfaces the real Cloudflare error."
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_COMPUTE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Deploy to Cloudflare Containers
         working-directory: shastra-compute
         run: npx wrangler deploy
@@ -131,16 +117,6 @@ jobs:
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
-
-      - name: Patch node:https out of server bundle
-        run: |
-          # Next.js font fetcher requires node:https at runtime which doesn't
-          # exist on Cloudflare Workers with compat_date < 2025-08-15.
-          # Enabling enable_nodejs_http_modules breaks OpenNext's IncomingMessage.
-          # Workaround: replace require("node:https") with require("node:http")
-          # which IS available as a polyfill. Font fetching won't work but the
-          # app won't crash — fonts fall back to system fonts.
-          find .open-next -name "fetch-resource.js" -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
 
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy
