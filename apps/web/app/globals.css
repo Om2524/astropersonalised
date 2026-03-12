@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -17,6 +18,7 @@
 }
 
 body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: linear-gradient(180deg, #a8cbee 0%, #b8d6f4 25%, #d0e3f8 50%, #dfe9f6 75%, #e8edf8 100%);
   background-attachment: fixed;
   color: var(--color-text-primary);
