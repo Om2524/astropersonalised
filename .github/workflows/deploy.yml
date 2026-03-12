@@ -133,14 +133,23 @@ jobs:
           find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
             -exec sed -i 's|p("https")|p("http")|g' {} + \
             -exec sed -i "s|p('https')|p('http')|g" {} +
-          # Re-bundle patched source into a single worker file.
-          # This replaces the multi-file .open-next output with one file
-          # so wrangler can deploy it with no_bundle (skipping its own esbuild).
-          npx --yes esbuild .open-next/worker.js --bundle --format=esm \
-            --outfile=.open-next/worker.bundled.js \
-            --platform=neutral \
-            --conditions=workerd,worker,import,require \
-            --external:node:* --external:cloudflare:*
+          # Re-bundle patched source into a single worker file using
+          # esbuild from wrangler's transitive dependencies.
+          node -e "
+            const esbuild = require(require.resolve('esbuild', {
+              paths: [require.resolve('wrangler')]
+            }));
+            esbuild.buildSync({
+              entryPoints: ['.open-next/worker.js'],
+              bundle: true,
+              format: 'esm',
+              outfile: '.open-next/worker.bundled.js',
+              platform: 'neutral',
+              conditions: ['workerd', 'worker', 'import', 'require'],
+              external: ['node:*', 'cloudflare:*'],
+              logLevel: 'warning'
+            });
+          "
           mv .open-next/worker.bundled.js .open-next/worker.js
           echo "Remaining https module references in final bundle:"
           grep -c 'require("https")\|require("node:https")\|p("https")' .open-next/worker.js || echo "  (none — all patched)"
