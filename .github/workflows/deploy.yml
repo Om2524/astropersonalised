@@ -133,7 +133,7 @@ jobs:
           grep -c '("https")' .open-next/bundled/worker.js || echo "  0 remaining"
 
       - name: Deploy patched worker
-        run: npx wrangler deploy --no-bundle .open-next/bundled/worker.js
+        run: npx wrangler deploy --no-bundle --x-autoconfig=false .open-next/bundled/worker.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
