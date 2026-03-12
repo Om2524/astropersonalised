@@ -2,6 +2,8 @@
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
  * Ask the astrology AI a question and get a structured reading.
@@ -36,7 +38,17 @@ export const askReading = action({
     chartData: v.string(),
     tone: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx: GenericActionCtx<GenericDataModel>,
+    args: {
+      sessionId: string;
+      userId?: Id<"users">;
+      query: string;
+      method: string;
+      chartData: string;
+      tone?: string;
+    }
+  ) => {
     // 1. Resolve tier
     const tierInfo = await ctx.runQuery(
       api.functions.subscriptions.getCurrentTier,

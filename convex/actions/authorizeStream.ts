@@ -2,6 +2,8 @@
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
  * Authorize a streaming reading connection.
@@ -37,7 +39,15 @@ export const authorizeStream = action({
     query: v.string(),
     method: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx: GenericActionCtx<GenericDataModel>,
+    args: {
+      sessionId: string;
+      userId?: Id<"users">;
+      query: string;
+      method: string;
+    }
+  ) => {
     // 1. Resolve tier
     const tierInfo = await ctx.runQuery(
       api.functions.subscriptions.getCurrentTier,

@@ -1,6 +1,7 @@
 import { Polar } from "@convex-dev/polar";
 import { components } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
+import type { Auth } from "convex/server";
 
 /**
  * Polar.sh subscription component for Sudarshan.
@@ -19,7 +20,7 @@ import { DataModel } from "./_generated/dataModel";
  */
 export const polar = new Polar<DataModel>(components.polar, {
   getUserInfo: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await (ctx as unknown as { auth: Auth }).auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated — sign in to manage subscriptions");
     }

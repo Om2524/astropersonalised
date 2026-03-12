@@ -121,15 +121,26 @@ jobs:
       - name: Patch node:https → node:http in server bundle
         run: |
           # node:https is unavailable on compat_date < 2025-08-15, but enabling
-          # it breaks OpenNext's IncomingMessage extends. Patch ALL .js files
+          # it breaks OpenNext's IncomingMessage extends. Patch ALL .js/.mjs files
           # to use node:http polyfill instead — Workers use fetch() internally
           # so the actual HTTP client is irrelevant.
-          find .open-next -type f -name '*.js' -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
-          find .open-next -type f -name '*.js' -exec sed -i "s|require('node:https')|require('node:http')|g" {} +
-          find .open-next -type f -name '*.js' -exec sed -i 's|from "node:https"|from "node:http"|g' {} +
-          find .open-next -type f -name '*.js' -exec sed -i "s|from 'node:https'|from 'node:http'|g" {} +
-          echo "Patched node:https references:"
-          grep -r "node:https" .open-next/ --include='*.js' -l || echo "  (none remaining — all patched)"
+          # Patch node:https (prefixed) in .js and .mjs files
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i 's|require("node:https")|require("node:http")|g' {} +
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i "s|require('node:https')|require('node:http')|g" {} +
+          # Patch bare https (no prefix) — Workers normalizes to node:https at runtime
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i 's|require("https")|require("http")|g' {} +
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i "s|require('https')|require('http')|g" {} +
+          # Patch ESM imports
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i 's|from "node:https"|from "node:http"|g' {} +
+          find .open-next -type f \( -name '*.js' -o -name '*.mjs' \) \
+            -exec sed -i "s|from 'node:https'|from 'node:http'|g" {} +
+          echo "Remaining node:https references (should be zero):"
+          grep -r 'require("node:https")\|require("https")\|require('\''node:https'\'')\|require('\''https'\'')' .open-next/ --include='*.js' --include='*.mjs' -l || echo "  (none — all patched)"
 
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy

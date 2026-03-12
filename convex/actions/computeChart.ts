@@ -2,6 +2,8 @@
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
  * Compute a natal chart via the Python Shastra Compute API.
@@ -41,7 +43,21 @@ export const computeChart = action({
     birthTimeQuality: v.string(),
     tone: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx: GenericActionCtx<GenericDataModel>,
+    args: {
+      sessionId: string;
+      userId?: Id<"users">;
+      dateOfBirth: string;
+      timeOfBirth?: string;
+      birthplace: string;
+      latitude: number;
+      longitude: number;
+      timezone: string;
+      birthTimeQuality: string;
+      tone: string;
+    }
+  ) => {
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
     const apiKey = process.env.SHASTRA_COMPUTE_API_KEY;
 

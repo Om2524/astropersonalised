@@ -126,7 +126,7 @@ export default function SavedReadingsPage() {
         </div>
       ) : (
         <div className="w-full max-w-2xl space-y-3">
-          {savedReadings.map((r) => {
+          {savedReadings.map((r: { _id: string; query: string; method: string; domain: string; reading: string; isSaved?: boolean; createdAt: number }) => {
             let readingData: { direct_answer?: string } = {};
             try {
               readingData = JSON.parse(r.reading);
