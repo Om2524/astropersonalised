@@ -25,7 +25,7 @@ export default function SavedReadingsPage() {
   );
 
   // Filter to only saved ones
-  const savedReadings = readings?.filter((r) => r.isSaved) ?? [];
+  const savedReadings = readings?.filter((r: { isSaved?: boolean }) => r.isSaved) ?? [];
 
   // Check if user is authenticated
   if (!subscription.loading && !subscription.isAuthenticated) {
