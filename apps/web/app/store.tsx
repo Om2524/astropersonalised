@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react";
 import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import type { CanonicalChart, UserProfile } from "@/app/types";
 
 const SESSION_KEY = "shastra_session_id";

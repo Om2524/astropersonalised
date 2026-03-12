@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAction } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { ArrowLeft, Loader2, Users } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/app/store";

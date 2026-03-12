@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAction } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";

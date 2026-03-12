@@ -3,7 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import {
   ArrowLeft, Calendar, Clock, MapPin, Briefcase, Heart, Sparkles, AlignLeft,
   Loader2, Trash2, AlertCircle, Crown, ExternalLink,

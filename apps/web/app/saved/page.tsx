@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import { Bookmark, BookmarkX, Loader2, Lock } from "lucide-react";
 import Link from "next/link";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 import AuthWall from "@/app/components/AuthWall";
 
 export default function SavedReadingsPage() {

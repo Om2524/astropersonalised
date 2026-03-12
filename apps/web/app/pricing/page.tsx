@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import { Check, ArrowLeft, Loader2, Crown, Sparkles, Star } from "lucide-react";

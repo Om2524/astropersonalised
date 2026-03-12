@@ -16,7 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAction, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { UserProfile } from "@/app/types";
 

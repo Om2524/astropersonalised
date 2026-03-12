@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { api } from "../../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";

@@ -3,9 +3,9 @@
 import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { X, Loader2, Mail } from "lucide-react";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 
 interface AuthWallProps {
