@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "path";
+import webpack from "webpack";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -8,27 +9,18 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   webpack: (config, { isServer }) => {
-    if (isServer && Array.isArray(config.externals)) {
-      // Prevent webpack from externalizing 'https' — Cloudflare Workers
-      // doesn't have node:https, but the ws library imports it at module
-      // load time. By bundling it instead of externalizing, webpack's
-      // module map resolves p("https") to our http shim.
-      config.externals = config.externals.map((external: unknown) => {
-        if (typeof external !== "function") return external;
-        return async (ctx: { request?: string }) => {
-          if (ctx.request === "https" || ctx.request === "node:https") {
-            return; // Don't externalize — resolve via alias below
-          }
-          return (external as Function)(ctx);
-        };
-      });
+    if (isServer) {
+      // Replace 'https' and 'node:https' with our http shim.
+      // NormalModuleReplacementPlugin intercepts BEFORE externals check,
+      // so webpack bundles the shim instead of externalizing to node:https
+      // (which doesn't exist on Cloudflare Workers).
       const shimPath = path.resolve(__dirname, "node-https-shim.cjs");
-      config.resolve = config.resolve || {};
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        https: shimPath,
-        "node:https": shimPath,
-      };
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(
+          /^(node:)?https$/,
+          shimPath
+        )
+      );
     }
     return config;
   },
