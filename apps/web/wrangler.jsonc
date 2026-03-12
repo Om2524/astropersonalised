@@ -8,13 +8,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Rewrite node:https → node:http at bundle time.
+  // Redirect https → http at bundle time via a physical shim file.
   // compat_date 2025-03-07 doesn't provide node:https, and bumping to
-  // 2025-08-15 breaks OpenNext's IncomingMessage extends. Workers use
-  // fetch() internally so http vs https is irrelevant at runtime.
+  // 2025-08-15 breaks OpenNext's IncomingMessage extends. The shim
+  // re-exports node:http which is available. Workers use fetch()
+  // internally so http vs https is functionally identical.
   "alias": {
-    "node:https": "node:http",
-    "https": "node:http"
+    "https": "./node-https-shim.cjs",
+    "node:https": "./node-https-shim.cjs"
   },
   "observability": {
     "enabled": true,
