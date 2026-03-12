@@ -109,6 +109,9 @@ jobs:
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
+      - name: Symlink convex into frontend
+        run: ln -s ../../convex convex
+
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
         env:
