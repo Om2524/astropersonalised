@@ -120,17 +120,17 @@ jobs:
 
       - name: Patch worker bundle (https → http for Workers runtime)
         run: |
-          # Workers (compat_date 2025-03-07) lack node:https. Webpack
-          # externalizes Node builtins so resolve.alias can't reach them.
-          # Webpack's minified require is a single letter — match any
-          # single-letter function call with "https" as sole argument,
-          # but only when preceded by a non-letter (avoids .includes() etc).
-          echo "Before patch:"
-          grep -oE '[a-z]\("https"\)' .open-next/worker.js | sort | uniq -c || true
-          sed -i -E 's/([^a-zA-Z])([a-z])\("https"\)/\1\2("http")/g' .open-next/worker.js
-          sed -i -E 's/([^a-zA-Z])([a-z])\("node:https"\)/\1\2("node:http")/g' .open-next/worker.js
-          echo "After patch:"
-          grep -oE '[a-z]\("https"\)' .open-next/worker.js | sort | uniq -c || echo "  0 remaining https requires"
+          # Workers (compat_date 2025-03-07) lack node:https. The webpack-
+          # bundled code may be in any .js file under .open-next/.
+          echo "=== Files containing https requires ==="
+          grep -rlE '[a-z]\("https"\)' .open-next/ || echo "  (none found in .open-next/)"
+          echo "=== Patterns found ==="
+          grep -rhoE '[a-z]\("https"\)' .open-next/ | sort | uniq -c || echo "  (none)"
+          echo "=== Patching all .js files ==="
+          find .open-next -name '*.js' -exec sed -i -E \
+            's/([^a-zA-Z])([a-z])\("https"\)/\1\2("http")/g; s/([^a-zA-Z])([a-z])\("node:https"\)/\1\2("node:http")/g' {} +
+          echo "=== After patch ==="
+          grep -rhoE '[a-z]\("https"\)' .open-next/ | sort | uniq -c || echo "  0 remaining https requires"
 
       - name: Deploy to Cloudflare
         run: pnpm exec opennextjs-cloudflare deploy
