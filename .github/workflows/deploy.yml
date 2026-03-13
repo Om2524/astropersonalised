@@ -100,6 +100,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Patch OpenNext esbuild (rewrite https→http plugin)
+        run: |
+          BUNDLE_SERVER=node_modules/@opennextjs/cloudflare/dist/cli/build/bundle-server.js
+          # Add an onResolve plugin that rewrites https→http before externalization
+          sed -i 's/plugins: \[/plugins: [\n            { name: "rewrite-https", setup(build) { build.onResolve({ filter: \/^(node:)?https$\/ }, (args) => ({ path: args.path.replace("https", "http"), external: true })); } },/' "$BUNDLE_SERVER"
+          echo "Patched bundle-server.js — added rewrite-https plugin"
+
       - name: Generate Convex types
         run: |
           ln -s apps/web/node_modules node_modules
@@ -131,6 +138,18 @@ jobs:
               -e 's/from "node:https"/from "node:http"/g' \
               -e "s/from 'node:https'/from 'node:http'/g" \
               {} +
+
+      - name: Verify no https references remain
+        run: |
+          echo "=== Checking for remaining https requires in .open-next/ ==="
+          FOUND=$(grep -r 'require("https")\|require('\''https'\'')\|require("node:https")\|require('\''node:https'\'')\|from "https"\|from '\''https'\''\|from "node:https"\|from '\''node:https'\''' .open-next/ --include='*.js' --include='*.mjs' --include='*.cjs' -l || true)
+          if [ -n "$FOUND" ]; then
+            echo "WARNING: Files still containing https references:"
+            echo "$FOUND"
+            grep -r 'require("https")\|require('\''https'\'')\|require("node:https")\|require('\''node:https'\'')' .open-next/ --include='*.js' --include='*.mjs' --include='*.cjs' -c || true
+          else
+            echo "OK: No https requires found in build output"
+          fi
 
       - name: Deploy
         run: npx wrangler deploy
