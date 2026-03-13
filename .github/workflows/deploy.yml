@@ -100,6 +100,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Force convex to use native WebSocket (not ws)
+        run: |
+          # The convex package's "node" export condition pulls in ws@8.18.0,
+          # which uses createRequire("https") at runtime — a dynamic require
+          # that bypasses all build-time patches. Cloudflare Workers provide
+          # native WebSocket, so ws is unnecessary.
+          cp node_modules/convex/dist/esm/browser/index.js node_modules/convex/dist/esm/browser/index-node.js
+          cp node_modules/convex/dist/cjs/browser/index.js node_modules/convex/dist/cjs/browser/index-node.js
+          echo "Forced convex browser to use native WebSocket"
+
       - name: Patch OpenNext esbuild (rewrite https→http plugin)
         run: |
           BUNDLE_SERVER=node_modules/@opennextjs/cloudflare/dist/cli/build/bundle-server.js

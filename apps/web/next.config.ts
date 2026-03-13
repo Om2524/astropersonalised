@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -8,9 +9,28 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Cloudflare Workers don't provide node:https at compat_date 2025-05-05.
-      // Intercept at the externals level (runs before resolve.alias) to make
-      // webpack emit require("http") wherever it would emit require("https").
+      // Force convex to use native WebSocket instead of ws library.
+      // The convex package's "node" export condition pulls in ws@8.18.0,
+      // which uses createRequire("https") at runtime — a dynamic require
+      // that bypasses all build-time patches. Cloudflare Workers provide
+      // native WebSocket, so ws is unnecessary.
+      const convexEsmBrowser = path.join(
+        process.cwd(),
+        "node_modules/convex/dist/esm/browser"
+      );
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        [path.join(convexEsmBrowser, "index-node.js")]: path.join(
+          convexEsmBrowser,
+          "index.js"
+        ),
+        [path.join(convexEsmBrowser, "simple_client-node.js")]: path.join(
+          convexEsmBrowser,
+          "simple_client.js"
+        ),
+      };
+
+      // Intercept any remaining static https requires at the externals level.
       const prevExternals = config.externals;
       config.externals = [
         async ({ request }: { request: string }) => {
