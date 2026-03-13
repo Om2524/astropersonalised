@@ -112,16 +112,32 @@ jobs:
       - name: Symlink convex into frontend
         run: ln -s ../../convex convex
 
-      - name: Patch ws to use http instead of https
+      - name: Patch node_modules to replace https with http
         run: |
           # Cloudflare Workers at compat_date 2025-05-05 don't provide
-          # node:https. The ws library requires it but only uses it for
-          # http.request()-compatible calls. Patch source before build.
-          WS_FILE=$(find node_modules -path '*/ws/lib/websocket.js' -type f | head -1)
-          echo "Patching: $WS_FILE"
-          grep -c "require.*https" "$WS_FILE" || true
-          sed -i "s/require('https')/require('http')/g; s/require(\"https\")/require(\"http\")/g" "$WS_FILE"
-          grep -c "require.*https" "$WS_FILE" || true
+          # node:https. On Workers, http and https are functionally identical
+          # (TLS is handled at platform level). Patch all bundled sources.
+          COUNT=0
+          find node_modules -name '*.js' -type f \
+            -not -path '*/wrangler/*' \
+            -not -path '*/esbuild/*' \
+            -not -path '*/miniflare/*' \
+            -not -path '*/workerd/*' \
+            | xargs grep -l "require('https')\|require(\"https\")" 2>/dev/null \
+            | while read f; do
+                sed -i "s/require('https')/require('http')/g; s/require(\"https\")/require(\"http\")/g" "$f"
+                echo "Patched: $f"
+              done
+          # Verify no https requires remain in key files
+          echo "--- Verification ---"
+          for f in $(find node_modules -name '*.js' -type f \
+            -path '*/ws/lib/websocket.js' -o \
+            -path '*/next/dist/compiled/ws/index.js' -o \
+            -path '*/convex/dist/*/simple_client-node.js' -o \
+            -path '*/next/dist/server/setup-http-agent-env.js' \
+            2>/dev/null); do
+            echo "$f: $(grep -c "require.*https" "$f" || echo 0) https requires"
+          done
 
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
