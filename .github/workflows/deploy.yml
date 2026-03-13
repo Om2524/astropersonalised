@@ -126,7 +126,7 @@ jobs:
           # Replace webpack runtime require("https") with require("http").
           # \b + single letter + ("https") targets only webpack-style calls
           # like p("https"), NOT protocol checks like includes("https").
-          find .next .open-next -name '*.js' -exec \
+          find .next .open-next -type f -name '*.js' -exec \
             sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' {} +
           echo "=== After patch ==="
           grep -rl '\b[a-zA-Z]("https")' .next/ .open-next/ 2>/dev/null | wc -l
