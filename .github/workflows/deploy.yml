@@ -112,24 +112,22 @@ jobs:
       - name: Symlink convex into frontend
         run: ln -s ../../convex convex
 
+      - name: Patch ws to use http instead of https
+        run: |
+          # Cloudflare Workers at compat_date 2025-05-05 don't provide
+          # node:https. The ws library requires it but only uses it for
+          # http.request()-compatible calls. Patch source before build.
+          WS_FILE=$(find node_modules -path '*/ws/lib/websocket.js' -type f | head -1)
+          echo "Patching: $WS_FILE"
+          grep -c 'require("https")' "$WS_FILE" || true
+          sed -i 's/require("https")/require("http")/g' "$WS_FILE"
+          grep -c 'require("https")' "$WS_FILE" || true
+
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
-
-      - name: Patch dynamic https→http in build output
-        run: |
-          # Patch .next/ (OpenNext esbuild reads from here) and .open-next/
-          echo "=== Before patch ==="
-          grep -rl '\b[a-zA-Z]("https")' .next/ .open-next/ 2>/dev/null | wc -l
-          # Replace webpack runtime require("https") with require("http").
-          # \b + single letter + ("https") targets only webpack-style calls
-          # like p("https"), NOT protocol checks like includes("https").
-          find .next .open-next -type f -name '*.js' -exec \
-            sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' {} +
-          echo "=== After patch ==="
-          grep -rl '\b[a-zA-Z]("https")' .next/ .open-next/ 2>/dev/null | wc -l
 
       - name: Deploy
         run: npx wrangler deploy
