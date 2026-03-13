@@ -118,29 +118,21 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
 
-      - name: Bundle (dry-run to capture esbuild output)
-        run: npx wrangler deploy --dry-run --outdir=.worker-dist
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Patch dynamic https requires
+      - name: Patch dynamic https→http in build output
         run: |
+          # Patch .next/ (OpenNext esbuild reads from here) and .open-next/
           echo "=== Before patch ==="
-          grep -c '("https")' .worker-dist/worker.js || true
+          grep -rl '\b[a-zA-Z]("https")' .next/ .open-next/ 2>/dev/null | wc -l
           # Replace webpack runtime require("https") with require("http").
           # \b + single letter + ("https") targets only webpack-style calls
           # like p("https"), NOT protocol checks like includes("https").
-          sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' .worker-dist/worker.js
+          find .next .open-next -name '*.js' -exec \
+            sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' {} +
           echo "=== After patch ==="
-          grep -c '("https")' .worker-dist/worker.js || true
+          grep -rl '\b[a-zA-Z]("https")' .next/ .open-next/ 2>/dev/null | wc -l
 
-      - name: Deploy patched bundle
-        run: |
-          # Hide open-next.config.ts so wrangler doesn't re-trigger OpenNext
-          mv open-next.config.ts open-next.config.ts.bak
-          npx wrangler deploy --no-bundle .worker-dist/worker.js
-          mv open-next.config.ts.bak open-next.config.ts
+      - name: Deploy
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
