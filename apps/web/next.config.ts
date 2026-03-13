@@ -9,13 +9,17 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Cloudflare Workers don't provide node:https at compat_date 2025-05-05.
-      // Redirect https → http at webpack resolution time so all compiled code
-      // uses http instead. On Workers, http and https are functionally identical.
-      config.resolve = config.resolve || {};
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        https: "http",
-      };
+      // Intercept at the externals level (runs before resolve.alias) to make
+      // webpack emit require("http") wherever it would emit require("https").
+      const prevExternals = config.externals;
+      config.externals = [
+        async ({ request }: { request: string }) => {
+          if (request === "https" || request === "node:https") {
+            return "commonjs http";
+          }
+        },
+        ...(Array.isArray(prevExternals) ? prevExternals : [prevExternals]),
+      ];
     }
     return config;
   },
