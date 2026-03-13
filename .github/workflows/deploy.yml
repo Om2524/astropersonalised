@@ -116,27 +116,31 @@ jobs:
         run: |
           # Cloudflare Workers at compat_date 2025-05-05 don't provide
           # node:https. On Workers, http and https are functionally identical
-          # (TLS is handled at platform level). Patch all bundled sources.
-          COUNT=0
-          find node_modules -name '*.js' -type f \
-            -not -path '*/wrangler/*' \
-            -not -path '*/esbuild/*' \
-            -not -path '*/miniflare/*' \
-            -not -path '*/workerd/*' \
-            | xargs grep -l "require('https')\|require(\"https\")" 2>/dev/null \
-            | while read f; do
-                sed -i "s/require('https')/require('http')/g; s/require(\"https\")/require(\"http\")/g" "$f"
-                echo "Patched: $f"
-              done
-          # Verify no https requires remain in key files
-          echo "--- Verification ---"
-          for f in $(find node_modules -name '*.js' -type f \
-            -path '*/ws/lib/websocket.js' -o \
-            -path '*/next/dist/compiled/ws/index.js' -o \
-            -path '*/convex/dist/*/simple_client-node.js' -o \
-            -path '*/next/dist/server/setup-http-agent-env.js' \
-            2>/dev/null); do
-            echo "$f: $(grep -c "require.*https" "$f" || echo 0) https requires"
+          # (TLS is handled at platform level).
+          # Only patch libraries that get bundled into the worker — NOT build
+          # tools (webpack, esbuild, wrangler, miniflare, edge-runtime, workerd).
+          TARGETS=(
+            "ws/lib/websocket.js"
+            "next/dist/compiled/ws/index.js"
+            "next/dist/compiled/http-proxy/index.js"
+            "next/dist/compiled/next-server/server.runtime.prod.js"
+            "next/dist/compiled/@mswjs/interceptors/ClientRequest/index.js"
+            "next/dist/server/setup-http-agent-env.js"
+            "convex/dist/esm/browser/simple_client-node.js"
+            "convex/dist/cjs/browser/simple_client-node.js"
+            "node-fetch/lib/index.js"
+            "form-data/lib/form_data.js"
+            "agentkeepalive/lib/https_agent.js"
+            "@smithy/node-http-handler/dist-cjs/index.js"
+            "@auth/core/providers/bungie.js"
+          )
+          for pattern in "${TARGETS[@]}"; do
+            for f in $(find node_modules -path "*/$pattern" -type f 2>/dev/null); do
+              before=$(grep -c "require.*https" "$f" || echo 0)
+              sed -i "s/require('https')/require('http')/g; s/require(\"https\")/require(\"http\")/g" "$f"
+              after=$(grep -c "require.*https" "$f" || echo 0)
+              echo "Patched $f ($before → $after)"
+            done
           done
 
       - name: Build with OpenNext
