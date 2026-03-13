@@ -119,9 +119,9 @@ jobs:
           # http.request()-compatible calls. Patch source before build.
           WS_FILE=$(find node_modules -path '*/ws/lib/websocket.js' -type f | head -1)
           echo "Patching: $WS_FILE"
-          grep -c 'require("https")' "$WS_FILE" || true
-          sed -i 's/require("https")/require("http")/g' "$WS_FILE"
-          grep -c 'require("https")' "$WS_FILE" || true
+          grep -c "require.*https" "$WS_FILE" || true
+          sed -i "s/require('https')/require('http')/g; s/require(\"https\")/require(\"http\")/g" "$WS_FILE"
+          grep -c "require.*https" "$WS_FILE" || true
 
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
