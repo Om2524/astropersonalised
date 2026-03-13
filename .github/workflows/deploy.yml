@@ -112,29 +112,38 @@ jobs:
       - name: Symlink convex into frontend
         run: ln -s ../../convex convex
 
-      - name: Bundle (dry-run to capture final esbuild output)
-        run: npx wrangler deploy --dry-run --outdir=.worker-dist
+      - name: Build with OpenNext
+        run: pnpm exec opennextjs-cloudflare build
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
+
+      - name: Bundle (dry-run to capture esbuild output)
+        run: npx wrangler deploy --dry-run --outdir=.worker-dist
+        env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Patch node:https → node:http in dynamic requires
+      - name: Patch dynamic https requires and deploy
         run: |
           echo "=== Files in .worker-dist ==="
-          ls -la .worker-dist/ || echo "No .worker-dist directory!"
+          ls -la .worker-dist/ 2>/dev/null || echo "No .worker-dist — trying .open-next"
+          # Determine which directory has the bundled output
+          if [ -d .worker-dist ]; then
+            BUNDLE_DIR=.worker-dist
+          else
+            BUNDLE_DIR=.open-next
+          fi
           echo "=== Before patch ==="
-          grep -c '("https")' .worker-dist/*.js || true
+          grep -c '("https")' $BUNDLE_DIR/*.js 2>/dev/null || true
           # Replace webpack runtime require("https") with require("http").
           # \b + single letter + ("https") targets only webpack-style calls
           # like p("https"), NOT protocol checks like includes("https").
-          sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' .worker-dist/*.js
+          find $BUNDLE_DIR -name '*.js' -exec sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' {} +
           echo "=== After patch ==="
-          grep -c '("https")' .worker-dist/*.js || true
-
-      - name: Deploy patched bundle
-        run: npx wrangler deploy --no-bundle .worker-dist/worker.js
+          grep -c '("https")' $BUNDLE_DIR/*.js 2>/dev/null || true
+          # Deploy the patched bundle
+          npx wrangler deploy --no-bundle $BUNDLE_DIR/worker.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
