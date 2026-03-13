@@ -112,17 +112,6 @@ jobs:
       - name: Symlink convex into frontend
         run: ln -s ../../convex convex
 
-      - name: Fix OpenNext IncomingMessage for native node:http
-        run: |
-          # At compat_date 2025-09-23, workerd provides node:http as ESM.
-          # "import http from 'node:http'" gets undefined (no default export).
-          # Fix: use named import for IncomingMessage.
-          REQ_FILE=$(find node_modules -path '*/@opennextjs/aws/dist/http/request.js' -type f | head -1)
-          echo "Patching: $REQ_FILE"
-          sed -i 's/import http from "node:http";/import { IncomingMessage as HttpIncomingMessage } from "node:http";/' "$REQ_FILE"
-          sed -i 's/extends http\.IncomingMessage/extends HttpIncomingMessage/' "$REQ_FILE"
-          cat "$REQ_FILE" | head -6
-
       - name: Build with OpenNext
         run: pnpm exec opennextjs-cloudflare build
         env:
