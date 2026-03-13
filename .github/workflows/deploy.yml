@@ -124,26 +124,23 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Patch dynamic https requires and deploy
+      - name: Patch dynamic https requires
         run: |
-          echo "=== Files in .worker-dist ==="
-          ls -la .worker-dist/ 2>/dev/null || echo "No .worker-dist — trying .open-next"
-          # Determine which directory has the bundled output
-          if [ -d .worker-dist ]; then
-            BUNDLE_DIR=.worker-dist
-          else
-            BUNDLE_DIR=.open-next
-          fi
           echo "=== Before patch ==="
-          grep -c '("https")' $BUNDLE_DIR/*.js 2>/dev/null || true
+          grep -c '("https")' .worker-dist/worker.js || true
           # Replace webpack runtime require("https") with require("http").
           # \b + single letter + ("https") targets only webpack-style calls
           # like p("https"), NOT protocol checks like includes("https").
-          find $BUNDLE_DIR -name '*.js' -exec sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' {} +
+          sed -i 's/\b\([a-zA-Z]\)("https")/\1("http")/g' .worker-dist/worker.js
           echo "=== After patch ==="
-          grep -c '("https")' $BUNDLE_DIR/*.js 2>/dev/null || true
-          # Deploy the patched bundle
-          npx wrangler deploy --no-bundle $BUNDLE_DIR/worker.js
+          grep -c '("https")' .worker-dist/worker.js || true
+
+      - name: Deploy patched bundle
+        run: |
+          # Hide open-next.config.ts so wrangler doesn't re-trigger OpenNext
+          mv open-next.config.ts open-next.config.ts.bak
+          npx wrangler deploy --no-bundle .worker-dist/worker.js
+          mv open-next.config.ts.bak open-next.config.ts
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
