@@ -60,7 +60,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const chart: CanonicalChart | null = useMemo(() => {
     if (!chartDoc?.chartData) return null;
     try {
-      return JSON.parse(chartDoc.chartData) as CanonicalChart;
+      const raw = JSON.parse(chartDoc.chartData);
+      return (raw.chart ?? raw) as CanonicalChart;
     } catch {
       return null;
     }
