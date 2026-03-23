@@ -1,11 +1,22 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import { Check, ArrowLeft, Loader2, Crown, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+
+/**
+ * Hardcoded Polar product IDs — these match the values in convex/polar.ts.
+ * Using these directly avoids relying on getConfiguredProducts (which can
+ * return empty when products haven't synced yet).
+ */
+const PRODUCT_IDS: Record<string, string> = {
+  dhyan: "458d3978-f6e2-49e3-9a1b-c1d5b2425f32",
+  moksha: "25bb8519-70d3-4a1a-83b5-ae2befb2a654",
+};
 
 interface TierInfo {
   key: string;
@@ -76,8 +87,26 @@ const TIERS: TierInfo[] = [
 export default function PricingPage() {
   const { sessionId } = useApp();
   const subscription = useSubscription(sessionId);
+  const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
-  const products = useQuery(api.polar.getConfiguredProducts, {});
+  async function handleSubscribe(tierKey: string) {
+    const productId = PRODUCT_IDS[tierKey];
+    if (!productId) return;
+
+    setLoadingTier(tierKey);
+    try {
+      const { url } = await generateCheckoutLink({
+        productIds: [productId],
+        origin: window.location.origin,
+        successUrl: window.location.origin + "/chat",
+      });
+      window.location.href = url;
+    } catch (err) {
+      console.error("Checkout failed:", err);
+      setLoadingTier(null);
+    }
+  }
 
   return (
     <div className="min-h-dvh px-4 py-8 sm:py-12">
@@ -103,14 +132,8 @@ export default function PricingPage() {
           {TIERS.map((tier) => {
             const isCurrent = subscription.tier === tier.key;
             const Icon = tier.icon;
-
-            // Get the Polar product ID for paid tiers
-            const productId =
-              tier.key === "dhyan"
-                ? products?.dhyan?.id
-                : tier.key === "moksha"
-                  ? products?.moksha?.id
-                  : null;
+            const productId = PRODUCT_IDS[tier.key] ?? null;
+            const isLoading = loadingTier === tier.key;
 
             return (
               <div
@@ -188,26 +211,28 @@ export default function PricingPage() {
                     Current Plan
                   </div>
                 ) : productId ? (
-                  <Link
-                    href={`/api/polar/checkout?productId=${productId}`}
-                    className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
+                  <button
+                    onClick={() => handleSubscribe(tier.key)}
+                    disabled={isLoading}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                       tier.highlight
                         ? "bg-accent text-white hover:brightness-110"
                         : "bg-white/30 border border-white/40 text-text-primary hover:bg-white/50"
                     }`}
                   >
-                    Subscribe to {tier.name} — {tier.price}
-                    {tier.period}
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 rounded-xl bg-white/20 border border-white/30 py-3 text-sm text-text-secondary">
-                    {products === undefined ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Redirecting...
+                      </>
                     ) : (
-                      "Coming Soon"
+                      <>
+                        Subscribe to {tier.name} — {tier.price}
+                        {tier.period}
+                      </>
                     )}
-                  </div>
-                )}
+                  </button>
+                ) : null}
               </div>
             );
           })}

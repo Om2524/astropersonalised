@@ -18,6 +18,7 @@ export const dailyBrief = action({
     chartData: v.string(),
     tone: v.optional(v.string()),
     tier: v.optional(v.string()),
+    targetDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
@@ -40,6 +41,7 @@ export const dailyBrief = action({
           chart_data: JSON.parse(args.chartData).chart,
           tone: args.tone ?? "practical",
           tier: args.tier ?? "maya",
+          ...(args.targetDate ? { target_date: args.targetDate } : {}),
         }),
       });
 

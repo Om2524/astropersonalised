@@ -53,6 +53,7 @@ export default function WeeklyOutlookPage() {
       const data = await weeklyOutlookAction({
         chartData: chartRaw,
         tone: tone || "practical",
+        weekStart: ws,
       });
       setOutlook(data as WeeklyData);
     }

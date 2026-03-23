@@ -16,6 +16,7 @@ export const weeklyOutlook = action({
   args: {
     chartData: v.string(),
     tone: v.optional(v.string()),
+    weekStart: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
@@ -37,6 +38,7 @@ export const weeklyOutlook = action({
         body: JSON.stringify({
           chart_data: JSON.parse(args.chartData).chart,
           tone: args.tone ?? "practical",
+          ...(args.weekStart ? { week_start: args.weekStart } : {}),
         }),
       });
 

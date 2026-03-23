@@ -214,7 +214,7 @@ export default function ChatPage() {
           body: JSON.stringify({
             query,
             method,
-            chart_data: chartRaw || "{}",
+            chart_data: chartRaw ? JSON.parse(chartRaw).chart : {},
             tone: tone || "practical",
           }),
           signal: controller.signal,

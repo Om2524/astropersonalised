@@ -41,6 +41,7 @@ export default function DailyBriefPage() {
       const data = await dailyBriefAction({
         chartData: chartRaw,
         tone: tone || "practical",
+        targetDate,
       });
       setBrief(data as DailyBriefData);
     } catch (err) { setError((err as Error).message || "Failed to load daily brief"); }
