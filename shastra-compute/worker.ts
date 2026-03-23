@@ -2,33 +2,64 @@
  * Cloudflare Worker entrypoint for Shastra Compute.
  *
  * Routes all incoming HTTP requests to a Cloudflare Container running
- * the FastAPI application. Containers scale to zero after 30 seconds
- * of inactivity and scale up to 10 instances under load.
- *
- * Traffic is distributed across container instances using random
- * selection via getContainer.
+ * the FastAPI application.
  */
 import { Container, getContainer } from "@cloudflare/containers";
 
 export class ShastraCompute extends Container {
-  /** Port the FastAPI uvicorn server listens on inside the container. */
   defaultPort = 8000;
-
-  /** Scale to zero after 5 minutes of no requests. */
   sleepAfter = "5m";
 
   override onStart() {
-    console.log("Container started successfully");
+    console.log("[container] started, port 8000 ready");
   }
 
   override onStop(stopParams: { exitCode: number; reason: string }) {
     console.log(
-      `Container stopped: exitCode=${stopParams.exitCode} reason=${stopParams.reason}`
+      `[container] stopped: exit=${stopParams.exitCode} reason=${stopParams.reason}`
     );
   }
 
   override onError(error: string) {
-    console.error("Container error:", error);
+    console.error("[container] error:", error);
+  }
+
+  /**
+   * Override fetch to use explicit startAndWaitForPorts with a longer timeout.
+   * Python cold start (numpy, pyswisseph, timezonefinder) needs more than the default 8s.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    // Log container running state before attempting start
+    console.log(`[container] running=${this.ctx.container.running}`);
+
+    try {
+      // Explicitly start with internet enabled and longer timeout
+      await this.startAndWaitForPorts({
+        ports: 8000,
+        startOptions: {
+          enableInternet: true,
+        },
+        cancellationOptions: {
+          instanceGetTimeoutMS: 60_000,
+          portReadyTimeoutMS: 120_000,
+          waitInterval: 1000,
+        },
+      });
+      console.log("[container] startAndWaitForPorts succeeded");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[container] startAndWaitForPorts failed:", msg);
+      return new Response(`Container startup failed: ${msg}`, { status: 503 });
+    }
+
+    // Forward request to the running container
+    const url = new URL(request.url);
+    url.hostname = "10.0.0.1";
+    url.port = "8000";
+    url.protocol = "http:";
+
+    const containerReq = new Request(url.toString(), request);
+    return fetch(containerReq);
   }
 }
 
@@ -37,14 +68,7 @@ interface Env {
 }
 
 export default {
-  /**
-   * Route all requests to a container instance.
-   *
-   * CORS headers are added for the forsee.life frontend domain
-   * and localhost for development.
-   */
   async fetch(request: Request, env: Env): Promise<Response> {
-    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -52,30 +76,28 @@ export default {
       });
     }
 
-    // Distribute load across up to 10 container instances using random selection
-    const instanceId = String(Math.floor(Math.random() * 10));
+    const instanceId = String(Math.floor(Math.random() * 5));
     const container = getContainer(env.SHASTRA_COMPUTE, instanceId);
-    const response = await container.fetch(request);
 
-    // Clone response to add CORS headers
-    const newResponse = new Response(response.body, response);
-    const cors = corsHeaders(request);
-    for (const [key, value] of Object.entries(cors)) {
-      newResponse.headers.set(key, value);
+    try {
+      const response = await container.fetch(request);
+      const newResponse = new Response(response.body, response);
+      const cors = corsHeaders(request);
+      for (const [key, value] of Object.entries(cors)) {
+        newResponse.headers.set(key, value);
+      }
+      return newResponse;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[worker] container.fetch error:", msg);
+      return new Response(`Error: ${msg}`, {
+        status: 502,
+        headers: corsHeaders(request),
+      });
     }
-
-    return newResponse;
   },
 };
 
-/**
- * Generate CORS headers based on the request origin.
- *
- * Allows:
- * - forsee.life and subdomains (production)
- * - localhost:3000 (development)
- * - Convex cloud deployments (Convex actions call the API)
- */
 function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "";
   const allowedOrigins = [
@@ -84,7 +106,6 @@ function corsHeaders(request: Request): Record<string, string> {
     "http://localhost:3000",
   ];
 
-  // Also allow Convex cloud origins (they call from actions)
   const isAllowed =
     allowedOrigins.includes(origin) ||
     origin.endsWith(".convex.cloud") ||
