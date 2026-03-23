@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Default models per provider
 GEMINI_MODEL = "gemini-2.0-flash"
-OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free"
+OPENROUTER_MODEL = "openrouter/free"
 
 
 def generate(
