@@ -134,6 +134,55 @@ cd apps/web && pnpm exec opennextjs-cloudflare && \
   pnpm exec wrangler pages deploy .open-next --project-name=forsee-life  # Frontend
 ```
 
+## Cloudflare Containers (shastra-compute)
+
+The Python API runs as a Cloudflare Container (not a regular Worker). Key differences:
+
+- **No time limit** — containers run as long as needed (unlike Workers' 30s CPU limit)
+- **Cold start** — first request after sleep takes ~10-30s (Python loads numpy, pyswisseph, timezonefinder)
+- **Warm requests** — instant while container is running
+- **`sleepAfter = "5m"`** — container scales to zero after 5 minutes of inactivity
+- **Startup timeout** — overridden to 60s in `worker.ts` (default 8s is too short for Python)
+- **Max 10 instances** — load distributed randomly across container instances
+- **Observability** — enabled in `wrangler.jsonc`, logs visible in Cloudflare Dashboard → Workers → shastra-compute → Logs
+
+Container secrets (API_KEY, GEMINI_API_KEY, STREAM_TOKEN_SECRET) are set as Cloudflare Worker secrets, NOT passed as container env vars. The Python app reads them via pydantic-settings from the environment.
+
+### Cloudflare API Token Requirements
+
+The `CLOUDFLARE_API_TOKEN` in GitHub Secrets needs these permissions:
+- Workers Scripts: Edit
+- Workers KV Storage: Edit
+- Workers Routes: Edit
+- Account Settings: Read
+- **Containers: Edit** (required for container image push)
+- Account must be on **Workers Paid plan** ($5/month) — Containers is a beta feature
+
+## Polar Subscriptions
+
+Managed via `@convex-dev/polar` component. Fully configured:
+
+| Component | File | What |
+|---|---|---|
+| Product IDs | `convex/polar.ts` | Dhyan + Moksha product IDs hardcoded |
+| Webhooks | `convex/http.ts` | `/polar/events` endpoint handles subscription lifecycle |
+| Tier resolution | `convex/functions/subscriptions.ts` | `getCurrentTier()` resolves maya/dhyan/moksha with grace periods |
+| Rate limiting | `convex/functions/queryUsage.ts` | Rolling 7-day window, compound indexes |
+| Frontend | `apps/web/app/hooks/useSubscription.ts` | `useSubscription()` hook for tier/limit info |
+| Cleanup | `convex/crons.ts` | Daily cleanup of queryUsage records > 8 days old |
+
+Polar webhook endpoint: `https://modest-mouse-216.convex.site/polar/events`
+Polar dashboard: [polar.sh](https://polar.sh)
+
+### Subscription Flow
+
+1. Anonymous user → "maya" tier (5 queries/week, free)
+2. User signs up → still "maya" until they subscribe
+3. User subscribes via Polar checkout → webhook fires → Convex updates subscription
+4. `getCurrentTier()` checks Polar subscription status → returns tier name
+5. `checkLimit()` counts queries in rolling 7-day window against tier limit
+6. Canceled subscriptions keep access until period end
+
 ## Conventions
 
 - Test on prod. No staging, no dev deployments.
@@ -143,3 +192,4 @@ cd apps/web && pnpm exec opennextjs-cloudflare && \
 - Anonymous users identified by `sessionId` in localStorage; migrated atomically on sign-up
 - Geocoding uses Nominatim (free, no API key) with in-memory caching
 - All astrology computation is stateless — no DB in shastra-compute
+- Deploy only via GitHub Actions (tag-based). Don't deploy locally with `wrangler deploy`.
