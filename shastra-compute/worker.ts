@@ -1,9 +1,9 @@
 /**
  * Cloudflare Worker entrypoint for Shastra Compute.
  *
- * Routes all incoming HTTP requests to a Cloudflare Container running
- * the FastAPI application. Worker secrets (API_KEY, GEMINI_API_KEY,
- * STREAM_TOKEN_SECRET) are passed to the container as env vars on start.
+ * Routes HTTP requests to a Cloudflare Container running FastAPI.
+ * Worker secrets are passed to the container as env vars via the
+ * Container class's envVars property.
  */
 import { Container, getContainer } from "@cloudflare/containers";
 
@@ -17,55 +17,28 @@ interface Env {
 export class ShastraCompute extends Container<Env> {
   defaultPort = 8000;
   sleepAfter = "5m";
+  enableInternet = true;
+
+  constructor(ctx: DurableObject["ctx"], env: Env) {
+    super(ctx, env);
+    // Pass Worker secrets to the container process as env vars
+    this.envVars = {
+      API_KEY: env.API_KEY ?? "",
+      GEMINI_API_KEY: env.GEMINI_API_KEY ?? "",
+      STREAM_TOKEN_SECRET: env.STREAM_TOKEN_SECRET ?? "",
+    };
+  }
 
   override onStart() {
     console.log("[container] started, port 8000 ready");
   }
 
   override onStop(stopParams: { exitCode: number; reason: string }) {
-    console.log(
-      `[container] stopped: exit=${stopParams.exitCode} reason=${stopParams.reason}`
-    );
+    console.log(`[container] stopped: exit=${stopParams.exitCode} reason=${stopParams.reason}`);
   }
 
   override onError(error: string) {
     console.error("[container] error:", error);
-  }
-
-  /**
-   * Start the container with secrets passed as env vars, then proxy the request.
-   */
-  override async fetch(request: Request): Promise<Response> {
-    try {
-      await this.startAndWaitForPorts({
-        ports: 8000,
-        startOptions: {
-          enableInternet: true,
-          env: {
-            API_KEY: this.env.API_KEY ?? "",
-            GEMINI_API_KEY: this.env.GEMINI_API_KEY ?? "",
-            STREAM_TOKEN_SECRET: this.env.STREAM_TOKEN_SECRET ?? "",
-          },
-        },
-        cancellationOptions: {
-          instanceGetTimeoutMS: 30_000,
-          portReadyTimeoutMS: 60_000,
-          waitInterval: 500,
-        },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[container] startup failed:", msg);
-      return new Response(`Container startup failed: ${msg}`, { status: 503 });
-    }
-
-    // Proxy request to the running container
-    const url = new URL(request.url);
-    url.hostname = "10.0.0.1";
-    url.port = "8000";
-    url.protocol = "http:";
-
-    return fetch(new Request(url.toString(), request));
   }
 }
 
