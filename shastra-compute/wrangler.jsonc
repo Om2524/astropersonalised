@@ -17,11 +17,14 @@
   },
 
   // Cloudflare Containers — runs the FastAPI Python API
+  // "basic" instance: 1/4 vCPU, 1 GiB RAM, 4 GB disk
+  // "lite" (default) is only 256 MiB — not enough for Python + numpy + timezonefinder
   "containers": [
     {
       "class_name": "ShastraCompute",
       "image": "./Dockerfile",
-      "max_instances": 10
+      "instance_type": "basic",
+      "max_instances": 5
     }
   ],
 
