@@ -2,11 +2,19 @@
  * Cloudflare Worker entrypoint for Shastra Compute.
  *
  * Routes all incoming HTTP requests to a Cloudflare Container running
- * the FastAPI application.
+ * the FastAPI application. Worker secrets (API_KEY, GEMINI_API_KEY,
+ * STREAM_TOKEN_SECRET) are passed to the container as env vars on start.
  */
 import { Container, getContainer } from "@cloudflare/containers";
 
-export class ShastraCompute extends Container {
+interface Env {
+  SHASTRA_COMPUTE: DurableObjectNamespace<ShastraCompute>;
+  API_KEY: string;
+  GEMINI_API_KEY: string;
+  STREAM_TOKEN_SECRET: string;
+}
+
+export class ShastraCompute extends Container<Env> {
   defaultPort = 8000;
   sleepAfter = "5m";
 
@@ -25,46 +33,40 @@ export class ShastraCompute extends Container {
   }
 
   /**
-   * Override fetch to use explicit startAndWaitForPorts with a longer timeout.
-   * Python cold start (numpy, pyswisseph, timezonefinder) needs more than the default 8s.
+   * Start the container with secrets passed as env vars, then proxy the request.
    */
   override async fetch(request: Request): Promise<Response> {
-    // Log container running state before attempting start
-    console.log(`[container] running=${this.ctx.container.running}`);
-
     try {
-      // Explicitly start with internet enabled and longer timeout
       await this.startAndWaitForPorts({
         ports: 8000,
         startOptions: {
           enableInternet: true,
+          env: {
+            API_KEY: this.env.API_KEY ?? "",
+            GEMINI_API_KEY: this.env.GEMINI_API_KEY ?? "",
+            STREAM_TOKEN_SECRET: this.env.STREAM_TOKEN_SECRET ?? "",
+          },
         },
         cancellationOptions: {
-          instanceGetTimeoutMS: 60_000,
-          portReadyTimeoutMS: 120_000,
-          waitInterval: 1000,
+          instanceGetTimeoutMS: 30_000,
+          portReadyTimeoutMS: 60_000,
+          waitInterval: 500,
         },
       });
-      console.log("[container] startAndWaitForPorts succeeded");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[container] startAndWaitForPorts failed:", msg);
+      console.error("[container] startup failed:", msg);
       return new Response(`Container startup failed: ${msg}`, { status: 503 });
     }
 
-    // Forward request to the running container
+    // Proxy request to the running container
     const url = new URL(request.url);
     url.hostname = "10.0.0.1";
     url.port = "8000";
     url.protocol = "http:";
 
-    const containerReq = new Request(url.toString(), request);
-    return fetch(containerReq);
+    return fetch(new Request(url.toString(), request));
   }
-}
-
-interface Env {
-  SHASTRA_COMPUTE: DurableObjectNamespace<ShastraCompute>;
 }
 
 export default {
@@ -89,7 +91,7 @@ export default {
       return newResponse;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[worker] container.fetch error:", msg);
+      console.error("[worker] error:", msg);
       return new Response(`Error: ${msg}`, {
         status: 502,
         headers: corsHeaders(request),
