@@ -14,8 +14,37 @@ export class ShastraCompute extends Container {
   /** Port the FastAPI uvicorn server listens on inside the container. */
   defaultPort = 8000;
 
-  /** Scale to zero after 30 seconds of no requests. */
-  sleepAfter = "30s";
+  /** Scale to zero after 5 minutes of no requests. */
+  sleepAfter = "5m";
+
+  /**
+   * Override fetch to allow a longer startup timeout.
+   * Default is 8s which is too short for Python + numpy + pyswisseph cold start.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    await this.startAndWaitForPorts({
+      ports: 8000,
+      cancellationOptions: {
+        instanceGetTimeoutMS: 30_000,
+        portReadyTimeoutMS: 60_000,
+      },
+    });
+    return super.fetch(request);
+  }
+
+  override onStart() {
+    console.log("Container started successfully");
+  }
+
+  override onStop(stopParams: { exitCode: number; reason: string }) {
+    console.log(
+      `Container stopped: exitCode=${stopParams.exitCode} reason=${stopParams.reason}`
+    );
+  }
+
+  override onError(error: string) {
+    console.error("Container error:", error);
+  }
 }
 
 interface Env {
