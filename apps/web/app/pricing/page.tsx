@@ -1,6 +1,6 @@
 "use client";
 
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
@@ -86,15 +86,23 @@ const TIERS: TierInfo[] = [
 
 export default function PricingPage() {
   const { sessionId } = useApp();
+  const currentUser = useQuery(api.functions.users.getCurrentUser);
   const subscription = useSubscription(sessionId);
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubscribe(tierKey: string) {
     const productId = PRODUCT_IDS[tierKey];
     if (!productId) return;
 
+    if (!currentUser) {
+      setError("Sign in first to subscribe");
+      return;
+    }
+
     setLoadingTier(tierKey);
+    setError(null);
     try {
       const { url } = await generateCheckoutLink({
         productIds: [productId],
@@ -103,7 +111,9 @@ export default function PricingPage() {
       });
       window.location.href = url;
     } catch (err) {
-      console.error("Checkout failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Checkout failed:", msg);
+      setError(msg.includes("authenticated") ? "Please sign in to subscribe" : "Checkout failed — try again");
       setLoadingTier(null);
     }
   }
@@ -237,6 +247,17 @@ export default function PricingPage() {
             );
           })}
         </div>
+
+        {error && (
+          <div className="mt-6 text-center">
+            <p className="text-sm text-red-400">{error}</p>
+            {!currentUser && (
+              <Link href="/auth/signin" className="text-sm text-accent hover:underline mt-1 inline-block">
+                Sign in to get started
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Footer note */}
         <p className="mt-8 text-center text-xs text-text-secondary/50">

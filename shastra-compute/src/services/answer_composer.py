@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 from typing import Generator
-from google import genai
+
 from pydantic import BaseModel
+
+from src.services import llm_client
 
 
 class ReadingResponse(BaseModel):
@@ -26,12 +28,11 @@ class ReadingResponse(BaseModel):
 
 
 class AnswerComposer:
-    """Composes personalized astrology readings from chart evidence via Gemini."""
+    """Composes personalized astrology readings from chart evidence via LLM."""
 
-    def __init__(self, api_key: str):
-        """Initialize with a Gemini API key."""
-        self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.0-flash"
+    def __init__(self):
+        """Initialize the answer composer (no API key needed; llm_client reads settings)."""
+        pass
 
     def compose(
         self,
@@ -44,13 +45,8 @@ class AnswerComposer:
         """Compose a structured reading from evidence (non-streaming)."""
         prompt = self._build_prompt(query, evidence, method, tone, birth_time_quality)
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-
-        data = json.loads(response.text)
+        text = llm_client.generate(prompt, json_mode=True)
+        data = json.loads(text)
         data["raw_text"] = self._format_reading(data)
         return ReadingResponse(**data)
 
@@ -67,14 +63,7 @@ class AnswerComposer:
             query, evidence, method, tone, birth_time_quality
         )
 
-        response = self.client.models.generate_content_stream(
-            model=self.model,
-            contents=prompt,
-        )
-
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        yield from llm_client.generate_stream(prompt)
 
     def _build_prompt(self, query, evidence, method, tone, birth_time_quality):
         """Build the structured JSON prompt for non-streaming readings."""

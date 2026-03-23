@@ -17,7 +17,6 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.auth import ApiKeyAuth, StreamTokenAuth
-from src.config import settings
 from src.core.calculator import ChartCalculator
 from src.core.geocoding import GeocodingService
 from src.core.models.chart import CanonicalChart
@@ -36,8 +35,8 @@ logger = logging.getLogger(__name__)
 # Services
 _geocoding = GeocodingService()
 _calculator = ChartCalculator()
-_query_router = QueryRouter(api_key=settings.gemini_api_key)
-_composer = AnswerComposer(api_key=settings.gemini_api_key)
+_query_router = QueryRouter()
+_composer = AnswerComposer()
 
 # Engines
 _engines = {

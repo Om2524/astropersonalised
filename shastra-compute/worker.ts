@@ -11,6 +11,7 @@ interface Env {
   SHASTRA_COMPUTE: DurableObjectNamespace<ShastraCompute>;
   API_KEY: string;
   GEMINI_API_KEY: string;
+  OPENROUTER_API_KEY: string;
   STREAM_TOKEN_SECRET: string;
 }
 
@@ -25,6 +26,7 @@ export class ShastraCompute extends Container<Env> {
     this.envVars = {
       API_KEY: env.API_KEY ?? "",
       GEMINI_API_KEY: env.GEMINI_API_KEY ?? "",
+      OPENROUTER_API_KEY: env.OPENROUTER_API_KEY ?? "",
       STREAM_TOKEN_SECRET: env.STREAM_TOKEN_SECRET ?? "",
     };
   }

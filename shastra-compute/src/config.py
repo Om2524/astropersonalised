@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     """Global settings for the Shastra Compute service."""
 
     gemini_api_key: str = ""
+    openrouter_api_key: str = ""
     geocoding_api_key: str = ""
     api_key: str = ""
     stream_token_secret: str = ""

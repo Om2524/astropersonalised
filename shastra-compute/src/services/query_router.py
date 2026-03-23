@@ -1,4 +1,4 @@
-"""Query analysis and routing service using Gemini.
+"""Query analysis and routing service using LLM.
 
 Classifies user questions into structured metadata (domain, intent,
 time-orientation, best-fit engine) so the reading pipeline can select
@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import json
 
-from google import genai
 from pydantic import BaseModel, Field
+
+from src.services import llm_client
 
 
 class QueryClassification(BaseModel):
@@ -37,12 +38,11 @@ class QueryClassification(BaseModel):
 
 
 class QueryRouter:
-    """Classifies astrology questions using Gemini for downstream routing."""
+    """Classifies astrology questions using an LLM for downstream routing."""
 
-    def __init__(self, api_key: str):
-        """Initialize with a Gemini API key."""
-        self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.0-flash"
+    def __init__(self):
+        """Initialize the query router (no API key needed; llm_client reads settings)."""
+        pass
 
     def classify(self, query: str) -> QueryClassification:
         """Classify a user's astrology question into structured metadata."""
@@ -85,11 +85,6 @@ class QueryRouter:
             f'User question: "{query}"'
         )
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-
-        data = json.loads(response.text)
+        text = llm_client.generate(prompt, json_mode=True)
+        data = json.loads(text)
         return QueryClassification(**data)

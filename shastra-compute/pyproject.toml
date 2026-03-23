@@ -10,6 +10,7 @@ dependencies = [
     "pyswisseph>=2.10",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    "openai>=1.0",
     "httpx>=0.28",
     "timezonefinder>=6.5",
     "python-dateutil>=2.9",

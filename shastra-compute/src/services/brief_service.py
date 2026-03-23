@@ -9,19 +9,16 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
-from google import genai
-
 from src.core.models.chart import CanonicalChart
 from src.core.calculator import ChartCalculator
+from src.services import llm_client
 
 
 class BriefService:
     """Generates daily briefs and weekly outlooks from chart + transit data."""
 
-    def __init__(self, api_key: str):
-        """Initialize with a Gemini API key."""
-        self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.0-flash"
+    def __init__(self):
+        """Initialize the brief service (no API key needed; llm_client reads settings)."""
         self.calculator = ChartCalculator()
 
     def generate_daily_brief(self, chart: CanonicalChart, target_date: date) -> dict:
@@ -66,7 +63,7 @@ class BriefService:
             "ascendant_sign": chart.houses_whole_sign[0].sign if chart.houses_whole_sign else None,
         }
 
-        # 5. Generate brief via Gemini
+        # 5. Generate brief via LLM
         prompt = f"""You are Shastra, an astrology AI. Generate a personalized daily brief for {target_date.strftime('%B %d, %Y')}.
 
 Based on this astrological data:
@@ -81,13 +78,8 @@ Write a daily brief in JSON format with these keys:
 
 Be warm, specific to the chart, and insightful. Never fearmonger. Return ONLY valid JSON."""
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-
-        data = json.loads(response.text)
+        text = llm_client.generate(prompt, json_mode=True)
+        data = json.loads(text)
         data["date"] = target_date.isoformat()
         data["moon_sign"] = moon_transit.sign if moon_transit else None
         data["moon_nakshatra"] = moon_transit.nakshatra if moon_transit else None
@@ -161,13 +153,8 @@ Write a weekly outlook in JSON format:
 
 Be warm and insightful. Return ONLY valid JSON."""
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-
-        data = json.loads(response.text)
+        text = llm_client.generate(prompt, json_mode=True)
+        data = json.loads(text)
         data["week_start"] = week_start.isoformat()
         data["week_end"] = (week_start + timedelta(days=6)).isoformat()
         return data

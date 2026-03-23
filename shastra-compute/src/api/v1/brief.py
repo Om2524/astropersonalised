@@ -8,14 +8,13 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from src.auth import ApiKeyAuth
-from src.config import settings
 from src.core.models.chart import CanonicalChart
 from src.services.brief_service import BriefService
 from src.api.schemas.brief import DailyRequest, WeeklyRequest
 
 router = APIRouter(prefix="/v1/brief", tags=["brief"])
 
-_brief_service = BriefService(api_key=settings.gemini_api_key)
+_brief_service = BriefService()
 
 
 @router.post("/daily")
