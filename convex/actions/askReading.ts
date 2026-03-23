@@ -114,7 +114,7 @@ export const askReading = action({
         body: JSON.stringify({
           query: args.query,
           method: args.method,
-          chart_data: args.chartData,
+          chart_data: JSON.parse(args.chartData),
           tone: args.tone ?? "practical",
         }),
       });

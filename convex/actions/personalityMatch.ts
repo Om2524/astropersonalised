@@ -36,7 +36,7 @@ export const personalityMatch = action({
           "X-API-Key": apiKey,
         },
         body: JSON.stringify({
-          chart_data: args.chartData,
+          chart_data: JSON.parse(args.chartData),
           tier: args.tier ?? "maya",
         }),
       });

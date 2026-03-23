@@ -35,7 +35,7 @@ export const weeklyOutlook = action({
           "X-API-Key": apiKey,
         },
         body: JSON.stringify({
-          chart_data: args.chartData,
+          chart_data: JSON.parse(args.chartData),
           tone: args.tone ?? "practical",
         }),
       });

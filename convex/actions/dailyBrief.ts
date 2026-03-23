@@ -37,7 +37,7 @@ export const dailyBrief = action({
           "X-API-Key": apiKey,
         },
         body: JSON.stringify({
-          chart_data: args.chartData,
+          chart_data: JSON.parse(args.chartData),
           tone: args.tone ?? "practical",
           tier: args.tier ?? "maya",
         }),
