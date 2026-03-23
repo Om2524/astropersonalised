@@ -1,9 +1,11 @@
 "use client";
 
-import { useAction, useQuery } from "convex/react";
+import { useAction } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
+import AuthWall from "@/app/components/AuthWall";
 import { Check, ArrowLeft, Loader2, Crown, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -86,18 +88,20 @@ const TIERS: TierInfo[] = [
 
 export default function PricingPage() {
   const { sessionId } = useApp();
-  const currentUser = useQuery(api.functions.users.getCurrentUser);
+  const { isAuthenticated } = useConvexAuth();
   const subscription = useSubscription(sessionId);
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthWall, setShowAuthWall] = useState(false);
 
   async function handleSubscribe(tierKey: string) {
     const productId = PRODUCT_IDS[tierKey];
     if (!productId) return;
 
-    if (!currentUser) {
-      setError("Sign in first to subscribe");
+    // Gate checkout behind authentication — Polar requires a user identity
+    if (!isAuthenticated) {
+      setShowAuthWall(true);
       return;
     }
 
@@ -113,7 +117,12 @@ export default function PricingPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Checkout failed:", msg);
-      setError(msg.includes("authenticated") ? "Please sign in to subscribe" : "Checkout failed — try again");
+      if (msg.includes("authenticated") || msg.includes("sign in")) {
+        setError("Please sign in to subscribe");
+        setShowAuthWall(true);
+      } else {
+        setError("Checkout failed. Please try again.");
+      }
       setLoadingTier(null);
     }
   }
@@ -251,11 +260,6 @@ export default function PricingPage() {
         {error && (
           <div className="mt-6 text-center">
             <p className="text-sm text-red-400">{error}</p>
-            {!currentUser && (
-              <Link href="/auth/signin" className="text-sm text-accent hover:underline mt-1 inline-block">
-                Sign in to get started
-              </Link>
-            )}
           </div>
         )}
 
@@ -265,6 +269,14 @@ export default function PricingPage() {
           Payments processed securely via Polar.
         </p>
       </div>
+
+      {/* Auth wall modal for unauthenticated users */}
+      <AuthWall
+        isOpen={showAuthWall}
+        onClose={() => setShowAuthWall(false)}
+        sessionId={sessionId}
+        reason="Sign in to subscribe"
+      />
     </div>
   );
 }

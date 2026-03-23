@@ -1,6 +1,7 @@
 import { Polar } from "@convex-dev/polar";
 import { components } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
+import { internalAction } from "./_generated/server";
 import type { Auth } from "convex/server";
 
 /**
@@ -55,3 +56,19 @@ export const {
   generateCheckoutLink,
   generateCustomerPortalUrl,
 } = polar.api();
+
+/**
+ * One-off action to sync Polar product catalog into the Convex component DB.
+ *
+ * Products created before the webhook was registered won't appear in
+ * getConfiguredProducts / listAllProducts until this runs at least once.
+ *
+ * Usage:
+ *   npx convex run polar:syncProducts --prod '{}'
+ */
+export const syncProducts = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    await polar.syncProducts(ctx);
+  },
+});
