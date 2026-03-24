@@ -24,7 +24,7 @@ export default function Home() {
         </div>
 
         <h1 className="mb-3 text-5xl font-bold tracking-tight text-text-primary sm:text-6xl">
-          Shastra
+          Tara
         </h1>
 
         <p className="mb-2 text-lg text-accent font-medium">

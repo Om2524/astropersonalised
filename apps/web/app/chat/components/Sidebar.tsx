@@ -83,7 +83,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
         <div className="flex items-center gap-2 px-4 pt-5 pb-4">
           <GalaxyLogo size={32} />
           <span className="text-lg font-semibold tracking-tight text-text-primary">
-            Shastra
+            Tara
           </span>
           {/* Tier badge */}
           <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tierBadgeClass}`}>
@@ -174,7 +174,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
         {/* Footer */}
         <div className="px-5 py-3">
           <p className="text-[10px] text-text-secondary/40">
-            Powered by Shastra
+            Powered by Tara
           </p>
         </div>
       </aside>

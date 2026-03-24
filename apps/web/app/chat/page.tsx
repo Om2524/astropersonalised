@@ -403,10 +403,10 @@ export default function ChatPage() {
         {isEmpty ? (
           /* ============ WELCOME SCREEN ============ */
           <div className="flex flex-1 flex-col items-center justify-center px-4">
-            <GalaxyLogo size={72} />
+            <GalaxyLogo size={120} />
 
-            <h1 className="mt-6 text-[28px] font-semibold text-text-primary tracking-tight">
-              Your chart. Your clarity.
+            <h1 className="mt-1 text-[28px] font-semibold text-text-primary tracking-tight">
+              We all are Stardust!
             </h1>
             <p className="mt-2 mb-10 max-w-md text-center text-[15px] text-text-secondary/70 leading-relaxed">
               Ask anything about your life — your birth chart holds the answers
