@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     openrouter_api_key: str = ""
-    openrouter_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_model: str = "google/gemini-2.0-flash-exp:free"
     geocoding_api_key: str = ""
     api_key: str = ""
     stream_token_secret: str = ""
