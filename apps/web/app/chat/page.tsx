@@ -375,6 +375,20 @@ export default function ChatPage() {
           );
           setIsLoading(false);
           setLedgerComplete(true);
+
+          // Still persist whatever we received so the query isn't lost
+          if (fullContent) {
+            const cls = classification as ChatMessage["classification"];
+            storeReading({
+              sessionId,
+              query,
+              method,
+              domain: cls?.domain ?? "general",
+              classification: JSON.stringify(cls ?? {}),
+              evidenceSummary: JSON.stringify(evidenceSummary ?? {}),
+              reading: JSON.stringify({ direct_answer: fullContent }),
+            }).catch((e) => console.error("Failed to store partial reading:", e));
+          }
         }
       } catch (err) {
         // If the user explicitly cancelled, just stop silently
