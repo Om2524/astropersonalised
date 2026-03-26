@@ -18,12 +18,21 @@ const schema = defineSchema({
    * Anonymous users only have a session record until they sign up.
    */
   users: defineTable({
-    email: v.string(),
+    // @convex-dev/auth required fields
+    email: v.optional(v.string()),
     name: v.optional(v.string()),
-    authProvider: v.string(),
-    language: v.string(),
-    createdAt: v.number(),
-  }).index("by_email", ["email"]),
+    image: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    // iktara custom fields
+    authProvider: v.optional(v.string()),
+    language: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
 
   /**
    * Anonymous and authenticated sessions.
