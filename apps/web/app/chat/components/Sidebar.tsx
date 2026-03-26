@@ -51,7 +51,8 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const { signOut } = useAuthActions();
 
-  const isSignedIn = currentUser !== null && currentUser !== undefined;
+  const isLoadingUser = currentUser === undefined;
+  const isSignedIn = !!currentUser;
   const tierBadgeClass = TIER_COLORS[subscription.tier] ?? TIER_COLORS.maya;
 
   return (
@@ -124,7 +125,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
 
         {/* User section */}
         <div className="px-3 pb-3">
-          {isSignedIn ? (
+          {isLoadingUser ? null : isSignedIn ? (
             <div className="rounded-xl bg-white/15 border border-white/25 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent text-xs font-semibold">
