@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface LedgerStep {
   step: number;
@@ -12,20 +12,55 @@ interface AnalysisLedgerProps {
   isComplete: boolean;
 }
 
+const COSMIC_WHISPERS = [
+  "Tuning into the celestial frequencies…",
+  "Asking the moon & stars…",
+  "Calculating planetary alignments…",
+  "Wandering the cosmos for answers…",
+  "Reading the language of light…",
+  "Consulting ancient star maps…",
+  "Tracing your karmic thread…",
+  "Listening to the silence between planets…",
+  "Decoding the zodiac whispers…",
+  "Aligning with your natal sky…",
+];
+
 export default function AnalysisLedger({
   steps,
   isComplete,
 }: AnalysisLedgerProps) {
   const [visibleIndex, setVisibleIndex] = useState(0);
+  const [cosmicIndex, setCosmicIndex] = useState(() =>
+    Math.floor(Math.random() * COSMIC_WHISPERS.length)
+  );
+  const cosmicTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cycle through cosmic whispers when no real steps yet
+  useEffect(() => {
+    if (steps.length > 0) {
+      if (cosmicTimer.current) clearInterval(cosmicTimer.current);
+      cosmicTimer.current = null;
+      return;
+    }
+
+    cosmicTimer.current = setInterval(() => {
+      setCosmicIndex((prev) => (prev + 1) % COSMIC_WHISPERS.length);
+    }, 2400);
+
+    return () => {
+      if (cosmicTimer.current) clearInterval(cosmicTimer.current);
+    };
+  }, [steps.length]);
 
   useEffect(() => {
     if (steps.length === 0) return;
     setVisibleIndex(steps.length - 1);
   }, [steps.length]);
 
-  if (steps.length === 0) return null;
-
-  const currentStep = steps[visibleIndex];
+  const showCosmic = steps.length === 0;
+  const displayText = showCosmic
+    ? COSMIC_WHISPERS[cosmicIndex]
+    : steps[visibleIndex]?.message;
 
   return (
     <div
@@ -44,10 +79,10 @@ export default function AnalysisLedger({
 
         {/* Dynamic text */}
         <span
-          key={currentStep?.step}
+          key={showCosmic ? `cosmic-${cosmicIndex}` : `step-${steps[visibleIndex]?.step}`}
           className="text-sm text-text-secondary animate-ledger-fade"
         >
-          {currentStep?.message}
+          {displayText}
         </span>
       </div>
 

@@ -32,7 +32,9 @@ export default function SettingsPage() {
   const subscription = useSubscription(sessionId);
   const computeChartAction = useAction(api.actions.computeChart.computeChart);
   const updateTone = useMutation(api.functions.birthProfiles.updateTone);
-  const portalUrl = useQuery(api.polar.generateCustomerPortalUrl, {});
+  const generatePortalUrl = useAction(api.polar.generateCustomerPortalUrl);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [dob, setDob] = useState(profile?.date_of_birth ?? "");
   const [tob, setTob] = useState(profile?.time_of_birth ?? "");
@@ -77,6 +79,18 @@ export default function SettingsPage() {
       updateTone({ sessionId, tone: newTone }).catch(() => {
         /* silent - will sync on next load */
       });
+    }
+  }
+
+  async function handleManageBilling() {
+    setPortalLoading(true);
+    try {
+      const result = await generatePortalUrl({});
+      if (result?.url) window.open(result.url, "_blank", "noopener,noreferrer");
+    } catch {
+      /* user may not have an active subscription */
+    } finally {
+      setPortalLoading(false);
     }
   }
 
@@ -131,15 +145,15 @@ export default function SettingsPage() {
                 <Sparkles size={14} /> Upgrade Plan
               </Link>
             )}
-            {portalUrl && subscription.tier !== "maya" && (
-              <a
-                href={portalUrl as string}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/20 px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-white/30 transition"
+            {subscription.tier !== "maya" && (
+              <button
+                type="button"
+                onClick={handleManageBilling}
+                disabled={portalLoading}
+                className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/20 px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-white/30 transition disabled:opacity-50"
               >
-                <ExternalLink size={14} /> Manage Billing
-              </a>
+                {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Manage Billing
+              </button>
             )}
           </div>
         </section>
