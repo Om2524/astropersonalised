@@ -82,6 +82,7 @@ npx convex env list --prod
 | `AUTH_GOOGLE_ID` | Google OAuth client ID | [Google Cloud Console → astra project → Credentials](https://console.cloud.google.com/apis/credentials?project=astra-474015) |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret | Same as above |
 | `AUTH_RESEND_KEY` | Email magic link API key | [Resend dashboard](https://resend.com/api-keys) |
+| `AUTH_RESEND_FROM` | Optional sender override for magic links | Defaults to `Forsee <noreply@forsee.life>` in `convex/auth.ts` |
 | `GEMINI_API_KEY` | Google Gemini LLM key | [Google AI Studio](https://aistudio.google.com/apikey) |
 | `POLAR_ORGANIZATION_TOKEN` | Polar API access | [Polar → Settings → API](https://polar.sh) |
 | `POLAR_WEBHOOK_SECRET` | Validates Polar webhook payloads | [Polar → Webhooks](https://polar.sh) (endpoint: `https://modest-mouse-216.convex.site/polar/events`) |
