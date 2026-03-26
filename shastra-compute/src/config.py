@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """Global settings for the Shastra Compute service."""
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.1-flash-lite-preview"
     openrouter_api_key: str = ""
     openrouter_model: str = "openrouter/free"
     geocoding_api_key: str = ""
