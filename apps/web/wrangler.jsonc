@@ -4,7 +4,7 @@
   "main": ".open-next/worker.js",
   "routes": [
     {
-      "pattern": "foresee.life",
+      "pattern": "forsee.life",
       "custom_domain": true
     }
   ],
