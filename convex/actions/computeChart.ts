@@ -114,7 +114,9 @@ export const computeChart = action({
       computedAt: now,
     });
 
-    // Store/update the birth profile
+    // Store/update the birth profile using geocoded values from the API response
+    // (args.latitude/longitude/timezone are frontend placeholders — the real
+    // values come from the Python geocoding service in chartResponse)
     const profileId = await ctx.runMutation(
       api.functions.birthProfiles.upsert,
       {
@@ -122,10 +124,10 @@ export const computeChart = action({
         userId: args.userId,
         dateOfBirth: args.dateOfBirth,
         timeOfBirth: args.timeOfBirth,
-        birthplace: args.birthplace,
-        latitude: args.latitude,
-        longitude: args.longitude,
-        timezone: args.timezone,
+        birthplace: chartResponse.display_name ?? args.birthplace,
+        latitude: chartResponse.latitude,
+        longitude: chartResponse.longitude,
+        timezone: chartResponse.timezone,
         birthTimeQuality: args.birthTimeQuality,
         tone: args.tone,
       }

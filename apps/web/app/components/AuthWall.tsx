@@ -37,12 +37,20 @@ export default function AuthWall({
     setError(null);
     try {
       const result = await signIn("google", { redirectTo: "/chat" });
-      // After auth, migrate anonymous session data
+      // After auth, migrate anonymous session data — if migration fails,
+      // still let auth succeed (data can be re-migrated later).
       if (result && typeof result === "object" && "userId" in result) {
-        await migrateSession({
-          sessionId,
-          userId: result.userId as Id<"users">,
-        });
+        try {
+          await migrateSession({
+            sessionId,
+            userId: result.userId as Id<"users">,
+          });
+        } catch (migrationErr) {
+          console.error(
+            "Session migration failed (auth will continue):",
+            migrationErr instanceof Error ? migrationErr.message : migrationErr
+          );
+        }
       }
     } catch (err) {
       setError(

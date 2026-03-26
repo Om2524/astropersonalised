@@ -13,10 +13,13 @@ class Settings(BaseSettings):
     """Global settings for the Shastra Compute service."""
 
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
     openrouter_api_key: str = ""
+    openrouter_model: str = "meta-llama/llama-3.1-8b-instruct:free"
     geocoding_api_key: str = ""
     api_key: str = ""
     stream_token_secret: str = ""
+    stream_timeout_seconds: int = 120
     environment: str = "development"
     log_level: str = "INFO"
 

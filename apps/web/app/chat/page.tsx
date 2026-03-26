@@ -127,6 +127,7 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const streamBuffer = useStreamBuffer();
 
   const scrollToBottom = useCallback(() => {
@@ -160,6 +161,9 @@ export default function ChatPage() {
       setIsLoading(true);
       setLedgerSteps([]);
       setLedgerComplete(false);
+
+      const controller = new AbortController();
+      abortRef.current = () => controller.abort();
 
       try {
         // Authorize the stream via Convex (handles rate limiting + HMAC token)
@@ -202,8 +206,9 @@ export default function ChatPage() {
           );
         });
 
-        const controller = new AbortController();
-        abortRef.current = () => controller.abort();
+        // Merge user-abort and 45s timeout into a single signal
+        const timeoutSignal = AbortSignal.timeout(45_000);
+        const mergedSignal = AbortSignal.any([controller.signal, timeoutSignal]);
 
         const res = await fetch(authResult.streamUrl, {
           method: "POST",
@@ -217,7 +222,7 @@ export default function ChatPage() {
             chart_data: chartRaw ? JSON.parse(chartRaw).chart : {},
             tone: tone || "practical",
           }),
-          signal: controller.signal,
+          signal: mergedSignal,
         });
 
         if (!res.ok || !res.body) {
@@ -235,6 +240,7 @@ export default function ChatPage() {
         }
 
         const reader = res.body.getReader();
+        readerRef.current = reader;
         const decoder = new TextDecoder();
         let buffer = "";
 
@@ -242,6 +248,11 @@ export default function ChatPage() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          // Exit early if stream was aborted
+          if (mergedSignal.aborted) {
+            await reader.cancel();
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const events = buffer.split("\n\n");
@@ -335,6 +346,8 @@ export default function ChatPage() {
           }
         }
 
+        readerRef.current = null;
+
         // If stream ended without a "done" event
         if (isLoading) {
           streamBuffer.flush();
@@ -350,21 +363,32 @@ export default function ChatPage() {
           setLedgerComplete(true);
         }
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
+        // If the user explicitly cancelled, just stop silently
+        if ((err as Error).name === "AbortError" && controller.signal.aborted) {
           streamBuffer.stop();
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: `Something went wrong: ${(err as Error).message}. Please try again.`,
-                  }
-                : m
-            )
-          );
           setIsLoading(false);
           setLedgerComplete(true);
+          return;
         }
+
+        // Timeout or other error — show a message
+        const isTimeout =
+          (err as Error).name === "TimeoutError" ||
+          ((err as Error).name === "AbortError" && !controller.signal.aborted);
+        const message = isTimeout
+          ? "The stars are taking longer than usual... Please try again."
+          : `Something went wrong: ${(err as Error).message}. Please try again.`;
+
+        streamBuffer.stop();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: message }
+              : m
+          )
+        );
+        setIsLoading(false);
+        setLedgerComplete(true);
       }
     },
     [isLoading, method, sessionId, chartRaw, tone, authorizeStreamAction, streamBuffer]
@@ -374,6 +398,10 @@ export default function ChatPage() {
     if (abortRef.current) {
       abortRef.current();
       abortRef.current = null;
+    }
+    if (readerRef.current) {
+      readerRef.current.cancel().catch(() => {});
+      readerRef.current = null;
     }
     streamBuffer.stop();
     setMessages([]);

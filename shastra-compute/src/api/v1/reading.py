@@ -10,6 +10,7 @@ Handles both structured (JSON) and streaming (SSE) reading flows:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -17,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.auth import ApiKeyAuth, StreamTokenAuth
+from src.config import settings
 from src.core.calculator import ChartCalculator
 from src.core.geocoding import GeocodingService
 from src.core.models.chart import CanonicalChart
@@ -145,73 +147,82 @@ async def ask(req: AskRequest, _auth: ApiKeyAuth) -> AskResponse:
 async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingResponse:
     """Stream a reading with analysis ledger events (SSE)."""
 
+    timeout = settings.stream_timeout_seconds
+
     async def event_stream():
         try:
-            # Ledger step 1: Analyzing
-            yield _sse_event("ledger", {"step": 1, "message": LEDGER_STEPS[0]})
+            async with asyncio.timeout(timeout):
+                # Ledger step 1: Analyzing
+                yield _sse_event("ledger", {"step": 1, "message": LEDGER_STEPS[0]})
 
-            # 1. Resolve chart
-            chart = await _resolve_chart(req)
-            yield _sse_event("ledger", {"step": 2, "message": LEDGER_STEPS[1]})
+                # 1. Resolve chart
+                chart = await _resolve_chart(req)
+                yield _sse_event("ledger", {"step": 2, "message": LEDGER_STEPS[1]})
 
-            # 2. Classify query
-            classification = _query_router.classify(req.query)
-            yield _sse_event("classification", classification.model_dump())
+                # 2. Classify query
+                classification = _query_router.classify(req.query)
+                yield _sse_event("classification", classification.model_dump())
 
-            # 3. Determine method
-            method = req.method if req.method != "auto" else classification.best_fit_engine
-            method_label = method.upper() if method != "compare" else "Compare All"
+                # 3. Determine method
+                method = req.method if req.method != "auto" else classification.best_fit_engine
+                method_label = method.upper() if method != "compare" else "Compare All"
 
-            yield _sse_event("ledger", {"step": 3, "message": LEDGER_STEPS[2]})
-            yield _sse_event("ledger", {"step": 4, "message": LEDGER_STEPS[3]})
-            yield _sse_event("ledger", {
-                "step": 5,
-                "message": LEDGER_STEPS[4].format(method=method_label),
-            })
-
-            # 4. Extract evidence
-            engine = _engines.get(method)
-            if engine is None:
-                yield _sse_event("error", {"message": f"Unknown method: {method}"})
-                return
-
-            evidence = engine.extract_evidence(chart, classification.domain, req.query)
-            evidence_dict = evidence.model_dump(mode="json")
-
-            yield _sse_event("ledger", {"step": 6, "message": LEDGER_STEPS[5]})
-            if method == "compare":
-                yield _sse_event("evidence_summary", {
-                    "relevant_planets": evidence.common_planets,
-                    "relevant_houses": evidence.common_houses,
-                    "confidence": evidence.strongest_confidence,
-                    "method": "compare",
-                })
-            else:
-                yield _sse_event("evidence_summary", {
-                    "relevant_planets": evidence.relevant_planets,
-                    "relevant_houses": evidence.relevant_houses,
-                    "confidence": evidence.confidence,
-                    "method": evidence.method,
+                yield _sse_event("ledger", {"step": 3, "message": LEDGER_STEPS[2]})
+                yield _sse_event("ledger", {"step": 4, "message": LEDGER_STEPS[3]})
+                yield _sse_event("ledger", {
+                    "step": 5,
+                    "message": LEDGER_STEPS[4].format(method=method_label),
                 })
 
-            yield _sse_event("ledger", {"step": 7, "message": LEDGER_STEPS[6]})
+                # 4. Extract evidence
+                engine = _engines.get(method)
+                if engine is None:
+                    yield _sse_event("error", {"message": f"Unknown method: {method}"})
+                    return
 
-            # 5a. Send structured planet context for visual rendering
-            planet_context = _build_planet_context(evidence, method, classification.domain)
-            yield _sse_event("planet_context", planet_context)
+                evidence = engine.extract_evidence(chart, classification.domain, req.query)
+                evidence_dict = evidence.model_dump(mode="json")
 
-            # 5b. Stream the reading
-            for chunk in _composer.compose_stream(
-                query=req.query,
-                evidence=evidence_dict,
-                method=method,
-                tone=req.tone,
-                birth_time_quality=req.birth_time_quality,
-            ):
-                yield _sse_event("content", {"text": chunk})
+                yield _sse_event("ledger", {"step": 6, "message": LEDGER_STEPS[5]})
+                if method == "compare":
+                    yield _sse_event("evidence_summary", {
+                        "relevant_planets": evidence.common_planets,
+                        "relevant_houses": evidence.common_houses,
+                        "confidence": evidence.strongest_confidence,
+                        "method": "compare",
+                    })
+                else:
+                    yield _sse_event("evidence_summary", {
+                        "relevant_planets": evidence.relevant_planets,
+                        "relevant_houses": evidence.relevant_houses,
+                        "confidence": evidence.confidence,
+                        "method": evidence.method,
+                    })
 
-            yield _sse_event("done", {"method_used": method})
+                yield _sse_event("ledger", {"step": 7, "message": LEDGER_STEPS[6]})
 
+                # 5a. Send structured planet context for visual rendering
+                planet_context = _build_planet_context(evidence, method, classification.domain)
+                yield _sse_event("planet_context", planet_context)
+
+                # 5b. Stream the reading
+                for chunk in _composer.compose_stream(
+                    query=req.query,
+                    evidence=evidence_dict,
+                    method=method,
+                    tone=req.tone,
+                    birth_time_quality=req.birth_time_quality,
+                ):
+                    yield _sse_event("content", {"text": chunk})
+
+                yield _sse_event("done", {"method_used": method})
+
+        except asyncio.TimeoutError:
+            logger.error("Streaming timed out after %d seconds", timeout)
+            yield _sse_event("error", {"message": f"Reading generation timed out after {timeout}s"})
+        except asyncio.CancelledError:
+            logger.info("Streaming cancelled by client disconnect")
+            return
         except Exception as e:
             logger.exception("Streaming error")
             yield _sse_event("error", {"message": str(e)})

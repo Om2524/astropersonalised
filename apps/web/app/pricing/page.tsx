@@ -108,16 +108,25 @@ export default function PricingPage() {
     setLoadingTier(tierKey);
     setError(null);
     try {
-      const { url } = await generateCheckoutLink({
+      const checkoutPromise = generateCheckoutLink({
         productIds: [productId],
         origin: window.location.origin,
         successUrl: window.location.origin + "/chat",
       });
+
+      // Race against a 15s timeout so the button doesn't hang forever
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("__timeout__")), 15_000)
+      );
+
+      const { url } = await Promise.race([checkoutPromise, timeoutPromise]);
       window.location.href = url;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Checkout failed:", msg);
-      if (msg.includes("authenticated") || msg.includes("sign in")) {
+      if (msg === "__timeout__") {
+        setError("Checkout is taking too long. Please try again.");
+      } else if (msg.includes("authenticated") || msg.includes("sign in")) {
         setError("Please sign in to subscribe");
         setShowAuthWall(true);
       } else {

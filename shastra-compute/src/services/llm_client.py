@@ -8,16 +8,12 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Default models per provider
-GEMINI_MODEL = "gemini-2.0-flash"
-OPENROUTER_MODEL = "openrouter/free"
-
 
 def generate(
     prompt: str,
     *,
     system: str = "",
-    model: str = GEMINI_MODEL,
+    model: str | None = None,
     json_mode: bool = False,
 ) -> str:
     """Generate text. Tries Gemini first, falls back to OpenRouter.
@@ -28,16 +24,20 @@ def generate(
         The user/content prompt.
     system : str
         Optional system instruction (Gemini) / system message (OpenRouter).
-    model : str
-        Gemini model name (ignored for OpenRouter fallback which uses its own default).
+    model : str | None
+        Gemini model name override. Defaults to ``settings.gemini_model``.
+        Ignored for the OpenRouter fallback which uses ``settings.openrouter_model``.
     json_mode : bool
         If True, request JSON output (``response_mime_type`` on Gemini,
         ``response_format`` on OpenRouter).
     """
+    gemini_model = model or settings.gemini_model
+
     # --- Try Gemini first ---
     if settings.gemini_api_key:
         try:
             from google import genai
+            from google.genai import errors as genai_errors
 
             client = genai.Client(api_key=settings.gemini_api_key)
 
@@ -48,18 +48,21 @@ def generate(
                 config["response_mime_type"] = "application/json"
 
             response = client.models.generate_content(
-                model=model,
+                model=gemini_model,
                 contents=prompt,
                 config=config if config else {},
             )
             return response.text
-        except Exception as e:
-            logger.warning("Gemini failed, falling back to OpenRouter: %s", e)
+        except (genai_errors.ClientError, genai_errors.ServerError) as e:
+            logger.warning("Gemini API error, falling back to OpenRouter: %s", e)
+        except (ConnectionError, TimeoutError) as e:
+            logger.warning("Gemini network error, falling back to OpenRouter: %s", e)
 
     # --- Fallback to OpenRouter ---
     if settings.openrouter_api_key:
         try:
             from openai import OpenAI
+            from openai import APIError, APIConnectionError, APITimeoutError
 
             client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
@@ -72,7 +75,7 @@ def generate(
             messages.append({"role": "user", "content": prompt})
 
             kwargs: dict = {
-                "model": OPENROUTER_MODEL,
+                "model": settings.openrouter_model,
                 "messages": messages,
             }
             if json_mode:
@@ -80,7 +83,7 @@ def generate(
 
             response = client.chat.completions.create(**kwargs)
             return response.choices[0].message.content
-        except Exception as e:
+        except (APIError, APIConnectionError, APITimeoutError) as e:
             logger.error("OpenRouter also failed: %s", e)
             raise
 
@@ -93,18 +96,21 @@ def generate_stream(
     prompt: str,
     *,
     system: str = "",
-    model: str = GEMINI_MODEL,
+    model: str | None = None,
 ):
     """Stream text chunks. Tries Gemini first, falls back to OpenRouter.
 
     Yields str chunks. This is a synchronous generator (the underlying
     Gemini SDK ``generate_content_stream`` is synchronous).
     """
+    gemini_model = model or settings.gemini_model
+
     # --- Try Gemini first ---
     gemini_failed = False
     if settings.gemini_api_key:
         try:
             from google import genai
+            from google.genai import errors as genai_errors
 
             client = genai.Client(api_key=settings.gemini_api_key)
 
@@ -113,15 +119,18 @@ def generate_stream(
                 config["system_instruction"] = system
 
             for chunk in client.models.generate_content_stream(
-                model=model,
+                model=gemini_model,
                 contents=prompt,
                 config=config if config else {},
             ):
                 if chunk.text:
                     yield chunk.text
             return  # success -- stop here
-        except Exception as e:
-            logger.warning("Gemini stream failed, falling back to OpenRouter: %s", e)
+        except (genai_errors.ClientError, genai_errors.ServerError) as e:
+            logger.warning("Gemini stream API error, falling back to OpenRouter: %s", e)
+            gemini_failed = True
+        except (ConnectionError, TimeoutError) as e:
+            logger.warning("Gemini stream network error, falling back to OpenRouter: %s", e)
             gemini_failed = True
 
     # --- Fallback to OpenRouter ---
@@ -139,7 +148,7 @@ def generate_stream(
         messages.append({"role": "user", "content": prompt})
 
         stream = client.chat.completions.create(
-            model=OPENROUTER_MODEL,
+            model=settings.openrouter_model,
             messages=messages,
             stream=True,
         )

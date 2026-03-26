@@ -91,10 +91,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Don't render until client-side hydration is complete
   if (!hydrated) return null;
 
+  // Convex useQuery returns undefined while loading, null when no doc exists.
+  // ready = queries finished AND data actually exists (not just "done loading").
   const ready =
     sessionId.length > 0 &&
-    birthProfile !== undefined &&
-    chartDoc !== undefined;
+    profile !== null &&
+    chart !== null;
 
   return (
     <AppContext.Provider
