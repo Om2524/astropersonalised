@@ -30,7 +30,7 @@ export default function SignInPage() {
     setLoading(true);
     setError(null);
     try {
-      await signIn("resend", { email: email.trim() });
+      await signIn("resend", { email: email.trim(), redirectTo: "/chat" });
       setEmailSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send magic link");
