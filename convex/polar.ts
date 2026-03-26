@@ -25,8 +25,11 @@ export const polar = new Polar<DataModel>(components.polar, {
     if (!identity) {
       throw new Error("Not authenticated — sign in to manage subscriptions");
     }
+    // @convex-dev/auth stores subject as "userId|sessionId"
+    // Extract just the userId (Convex document _id) for Polar customer lookup
+    const [userId] = identity.subject.split("|");
     return {
-      userId: identity.subject,
+      userId,
       email: identity.email!,
     };
   },
