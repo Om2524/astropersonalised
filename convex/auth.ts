@@ -3,7 +3,7 @@ import Resend from "@auth/core/providers/resend";
 import { convexAuth } from "@convex-dev/auth/server";
 
 const resendFrom =
-  process.env.AUTH_RESEND_FROM ?? "Forsee <noreply@forsee.life>";
+  process.env.AUTH_RESEND_FROM ?? "iktara <noreply@forsee.life>";
 
 export const { auth, signIn, signOut, store } = convexAuth({
   providers: [

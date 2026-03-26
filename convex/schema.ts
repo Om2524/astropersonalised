@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 /**
- * Sudarshan database schema.
+ * iktara database schema.
  *
  * All tables use compound indexes for efficient querying.
  * The queryUsage and readings tables require compound indexes

@@ -8,7 +8,7 @@ import { AppProvider } from "@/app/store";
 const sourceSerif = Source_Serif_4({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Tara — Personalized Astrology AI",
+  title: "iktara — Personalized Astrology AI",
   description: "Personalized astrology insights powered by AI",
 };
 

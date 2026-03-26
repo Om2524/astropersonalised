@@ -5,7 +5,7 @@ import { internalAction } from "./_generated/server";
 import type { Auth } from "convex/server";
 
 /**
- * Polar.sh subscription component for Sudarshan.
+ * Polar.sh subscription component for iktara.
  *
  * Products:
  * - dhyan: $100/month (50 queries/week)
