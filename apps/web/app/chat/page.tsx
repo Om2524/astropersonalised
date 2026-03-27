@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
@@ -113,7 +113,8 @@ function useStreamBuffer() {
 
 export default function ChatPage() {
   const { sessionId, profile, chart, chartRaw, tone } = useApp();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const authorizeStreamAction = useAction(api.actions.authorizeStream.authorizeStream);
   const storeReading = useMutation(api.functions.readings.store);
 
@@ -170,6 +171,7 @@ export default function ChatPage() {
         // Authorize the stream via Convex (handles rate limiting + HMAC token)
         const authResult = await authorizeStreamAction({
           sessionId,
+          userId: currentUser?._id ?? undefined,
           query,
           method,
         });
@@ -328,13 +330,16 @@ export default function ChatPage() {
                   const cls = classification as ChatMessage["classification"];
                   storeReading({
                     sessionId,
+                    userId: currentUser?._id ?? undefined,
                     query,
                     method: methodUsed ?? method,
                     domain: cls?.domain ?? "general",
                     classification: JSON.stringify(cls ?? {}),
                     evidenceSummary: JSON.stringify(evidenceSummary ?? {}),
                     reading: JSON.stringify(reading ?? { direct_answer: fullContent }),
-                  }).catch((e) => console.error("Failed to store reading:", e));
+                  }).catch((error: unknown) =>
+                    console.error("Failed to store reading:", error)
+                  );
 
                   break;
                 }
@@ -381,13 +386,16 @@ export default function ChatPage() {
             const cls = classification as ChatMessage["classification"];
             storeReading({
               sessionId,
+              userId: currentUser?._id ?? undefined,
               query,
               method,
               domain: cls?.domain ?? "general",
               classification: JSON.stringify(cls ?? {}),
               evidenceSummary: JSON.stringify(evidenceSummary ?? {}),
               reading: JSON.stringify({ direct_answer: fullContent }),
-            }).catch((e) => console.error("Failed to store partial reading:", e));
+            }).catch((error: unknown) =>
+              console.error("Failed to store partial reading:", error)
+            );
           }
         }
       } catch (err) {
@@ -419,7 +427,17 @@ export default function ChatPage() {
         setLedgerComplete(true);
       }
     },
-    [isLoading, method, sessionId, chartRaw, tone, authorizeStreamAction, storeReading, streamBuffer]
+    [
+      isLoading,
+      method,
+      sessionId,
+      chartRaw,
+      tone,
+      currentUser?._id,
+      authorizeStreamAction,
+      storeReading,
+      streamBuffer,
+    ]
   );
 
   const handleNewReading = useCallback(() => {

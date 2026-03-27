@@ -12,23 +12,33 @@ import AuthWall from "@/app/components/AuthWall";
 
 export default function SavedReadingsPage() {
   const { sessionId } = useApp();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const toggleSave = useMutation(api.functions.readings.toggleSave);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [showAuth, setShowAuth] = useState(false);
 
-  // Saved readings require auth - list by session for now
   const readings = useQuery(
-    api.functions.readings.listBySession,
-    sessionId ? { sessionId } : "skip"
+    api.functions.readings.listSaved,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
   );
 
-  // Filter to only saved ones
-  const savedReadings = readings?.filter((r: { isSaved?: boolean }) => r.isSaved) ?? [];
+  const savedReadings = readings ?? [];
+
+  if (currentUser === undefined || subscription.loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-4">
+        <div className="flex w-full max-w-2xl flex-col items-center gap-4 glass-section p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <p className="text-sm text-text-secondary">Loading your account...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Check if user is authenticated
-  if (!subscription.loading && !subscription.isAuthenticated) {
+  if (!currentUser || !subscription.isAuthenticated) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4">
         <div className="max-w-md glass-section p-8 text-center">

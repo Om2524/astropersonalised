@@ -1,6 +1,6 @@
 "use client";
 
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
@@ -89,7 +89,8 @@ const TIERS: TierInfo[] = [
 export default function PricingPage() {
   const { sessionId } = useApp();
   const { isAuthenticated } = useConvexAuth();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

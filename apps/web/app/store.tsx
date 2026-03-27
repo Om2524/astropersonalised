@@ -5,10 +5,11 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
   useMemo,
 } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { CanonicalChart, UserProfile } from "@/app/types";
 
@@ -38,11 +39,15 @@ function getOrGenerateSessionId(): string {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const migrateSession = useMutation(api.functions.users.migrateSession);
+  const lastMigratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSessionId(getOrGenerateSessionId());
     setHydrated(true);
   }, []);
+
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
 
   // Fetch birth profile from Convex
   const birthProfile = useQuery(
@@ -87,6 +92,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [birthProfile]);
 
   const tone = profile?.tone ?? "practical";
+
+  useEffect(() => {
+    if (!sessionId || !currentUser?._id) {
+      return;
+    }
+
+    const migrationKey = `${sessionId}:${currentUser._id}`;
+    if (lastMigratedKeyRef.current === migrationKey) {
+      return;
+    }
+    lastMigratedKeyRef.current = migrationKey;
+
+    migrateSession({
+      sessionId,
+      userId: currentUser._id,
+    }).catch((error: unknown) => {
+      console.error("Failed to migrate session after sign-in:", error);
+      lastMigratedKeyRef.current = null;
+    });
+  }, [currentUser?._id, migrateSession, sessionId]);
 
   // Don't render until client-side hydration is complete
   if (!hydrated) return null;

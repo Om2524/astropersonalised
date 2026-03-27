@@ -47,8 +47,8 @@ const TIER_COLORS: Record<string, string> = {
 
 export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps) {
   const { sessionId } = useApp();
-  const subscription = useSubscription(sessionId);
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const { signOut } = useAuthActions();
 
   const isLoadingUser = currentUser === undefined;
