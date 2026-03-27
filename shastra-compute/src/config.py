@@ -14,8 +14,6 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.1-flash-lite-preview"
-    openrouter_api_key: str = ""
-    openrouter_model: str = "openrouter/free"
     geocoding_api_key: str = ""
     api_key: str = ""
     stream_token_secret: str = ""
