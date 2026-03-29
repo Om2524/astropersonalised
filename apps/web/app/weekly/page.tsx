@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
@@ -38,7 +38,8 @@ function ratingDots(rating: number) {
 
 export default function WeeklyOutlookPage() {
   const { chart, chartRaw, tone, sessionId } = useApp();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const weeklyOutlookAction = useAction(api.actions.weeklyOutlook.weeklyOutlook);
 
   const [weekStart, setWeekStart] = useState(currentWeekStart());

@@ -111,17 +111,29 @@ export const upsert = mutation({
  */
 export const updateTone = mutation({
   args: {
-    sessionId: v.string(),
+    sessionId: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
     tone: v.string(),
   },
-  handler: async (ctx, { sessionId, tone }) => {
-    const profile = await ctx.db
-      .query("birthProfiles")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .unique();
+  handler: async (ctx, { sessionId, userId, tone }) => {
+    let profile = null;
+
+    if (userId) {
+      profile = await ctx.db
+        .query("birthProfiles")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .first();
+    }
+
+    if (!profile && sessionId) {
+      profile = await ctx.db
+        .query("birthProfiles")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+        .unique();
+    }
 
     if (!profile) {
-      throw new Error("Birth profile not found for this session");
+      throw new Error("Birth profile not found");
     }
 
     await ctx.db.patch(profile._id, { tone });

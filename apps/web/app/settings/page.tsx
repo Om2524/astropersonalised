@@ -29,7 +29,8 @@ const TIER_LABELS: Record<string, string> = {
 export default function SettingsPage() {
   const router = useRouter();
   const { profile, sessionId } = useApp();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const computeChartAction = useAction(api.actions.computeChart.computeChart);
   const updateTone = useMutation(api.functions.birthProfiles.updateTone);
   const generatePortalUrl = useAction(api.polar.generateCustomerPortalUrl);
@@ -55,6 +56,7 @@ export default function SettingsPage() {
     try {
       await computeChartAction({
         sessionId,
+        userId: currentUser?._id ?? undefined,
         dateOfBirth: dob,
         timeOfBirth: tob || undefined,
         birthplace: birthplace.trim(),
@@ -76,7 +78,11 @@ export default function SettingsPage() {
   function handleToneChange(newTone: UserProfile["tone"]) {
     setTone(newTone);
     if (sessionId) {
-      updateTone({ sessionId, tone: newTone }).catch(() => {
+      updateTone({
+        sessionId,
+        userId: currentUser?._id ?? undefined,
+        tone: newTone,
+      }).catch(() => {
         /* silent - will sync on next load */
       });
     }

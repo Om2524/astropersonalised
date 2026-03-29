@@ -15,7 +15,7 @@ import {
   ChevronLeft,
   AlertCircle,
 } from "lucide-react";
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { UserProfile } from "@/app/types";
@@ -37,6 +37,7 @@ const STEPS = ["Birth Details", "Preferences", "Computing"];
 export default function OnboardingPage() {
   const router = useRouter();
   const { sessionId } = useApp();
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const computeChartAction = useAction(api.actions.computeChart.computeChart);
   const registerSession = useMutation(api.functions.sessions.getOrCreate);
 
@@ -68,6 +69,7 @@ export default function OnboardingPage() {
       // and stores both the birth profile and chart in Convex
       await computeChartAction({
         sessionId,
+        userId: currentUser?._id ?? undefined,
         dateOfBirth: dob,
         timeOfBirth,
         birthplace: birthplace.trim(),

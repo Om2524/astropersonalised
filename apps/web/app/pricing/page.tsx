@@ -284,7 +284,6 @@ export default function PricingPage() {
       <AuthWall
         isOpen={showAuthWall}
         onClose={() => setShowAuthWall(false)}
-        sessionId={sessionId}
         reason="Sign in to subscribe"
       />
     </div>

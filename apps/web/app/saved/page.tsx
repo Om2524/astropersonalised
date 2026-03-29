@@ -59,7 +59,6 @@ export default function SavedReadingsPage() {
         <AuthWall
           isOpen={showAuth}
           onClose={() => setShowAuth(false)}
-          sessionId={sessionId}
           reason="Sign in to view saved readings"
         />
       </div>

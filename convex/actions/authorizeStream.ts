@@ -5,6 +5,8 @@ import { v } from "convex/values";
 import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import type { Id } from "../_generated/dataModel";
 
+const ANONYMOUS_PREVIEW_LIMIT = 1;
+
 /**
  * Authorize a streaming reading connection.
  *
@@ -76,6 +78,25 @@ export const authorizeStream = action({
               ? "Upgrade to Moksha for 500 queries/week."
               : "Your limit resets soon."
         }`,
+        usage: {
+          used: usage.used,
+          limit: usage.limit,
+          remaining: usage.remaining,
+          resetsAt: usage.resetsAt,
+        },
+        tier: tierInfo.tier,
+        token: null,
+        expiresAt: null,
+        streamUrl: null,
+      };
+    }
+
+    if (!args.userId && usage.used >= ANONYMOUS_PREVIEW_LIMIT) {
+      return {
+        success: false,
+        error: "auth_required",
+        message:
+          "Sign in to continue this conversation and save your astrology profile.",
         usage: {
           used: usage.used,
           limit: usage.limit,
