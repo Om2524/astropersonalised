@@ -1,9 +1,30 @@
 "use node";
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import type { Id } from "../_generated/dataModel";
+
+type PublicAction = ReturnType<typeof action>;
+
+type ComputeChartArgs = {
+  sessionId: string;
+  userId?: Id<"users">;
+  dateOfBirth: string;
+  timeOfBirth?: string;
+  birthplace: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  birthTimeQuality: string;
+  tone: string;
+};
+
+type ComputeChartResult = {
+  chartId: Id<"canonicalCharts">;
+  profileId: Id<"birthProfiles">;
+  chartData: unknown;
+  computedAt: number;
+};
 
 /**
  * Compute a natal chart via the Python Shastra Compute API.
@@ -30,7 +51,7 @@ import type { Id } from "../_generated/dataModel";
  * @param tone - Preferred reading tone
  * @returns The computed chart data and birth profile ID
  */
-export const computeChart = action({
+export const computeChart: PublicAction = action({
   args: {
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
@@ -44,20 +65,9 @@ export const computeChart = action({
     tone: v.string(),
   },
   handler: async (
-    ctx: GenericActionCtx<GenericDataModel>,
-    args: {
-      sessionId: string;
-      userId?: Id<"users">;
-      dateOfBirth: string;
-      timeOfBirth?: string;
-      birthplace: string;
-      latitude: number;
-      longitude: number;
-      timezone: string;
-      birthTimeQuality: string;
-      tone: string;
-    }
-  ) => {
+    ctx: ActionCtx,
+    args: ComputeChartArgs
+  ): Promise<ComputeChartResult> => {
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
     const apiKey = process.env.SHASTRA_COMPUTE_API_KEY;
 

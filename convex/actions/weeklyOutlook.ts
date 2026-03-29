@@ -1,24 +1,52 @@
 "use node";
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
+import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+
+type PublicAction = ReturnType<typeof action>;
+
+type WeeklyOutlookArgs = {
+  sessionId: string;
+  userId?: Id<"users">;
+  chartData: string;
+  tone?: string;
+  weekStart?: string;
+};
 
 /**
  * Generate a personalized weekly outlook via the Python Shastra Compute API.
  *
- * No rate limiting on weekly outlooks — available to Dhyan and Moksha tiers.
- * Maya tier does not have access to this feature (enforced by frontend).
+ * No message metering on weekly outlooks, but the feature is locked to Moksha.
  *
  * @param chartData - JSON string of the canonical chart
  * @param tone - Preferred reading tone
  * @returns The weekly outlook content
  */
-export const weeklyOutlook = action({
+export const weeklyOutlook: PublicAction = action({
   args: {
+    sessionId: v.string(),
+    userId: v.optional(v.id("users")),
     chartData: v.string(),
     tone: v.optional(v.string()),
     weekStart: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx: ActionCtx,
+    args: WeeklyOutlookArgs
+  ): Promise<unknown> => {
+    const tierInfo = await ctx.runQuery(
+      api.functions.subscriptions.getCurrentTier,
+      {
+        sessionId: args.sessionId,
+        userId: args.userId,
+      }
+    );
+
+    if (tierInfo.tier !== "moksha") {
+      throw new Error("Weekly outlook is part of Moksha Unlimited.");
+    }
+
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
     const apiKey = process.env.SHASTRA_COMPUTE_API_KEY;
 

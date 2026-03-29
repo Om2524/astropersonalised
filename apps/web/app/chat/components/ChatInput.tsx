@@ -15,6 +15,7 @@ interface ChatInputProps {
   isLoading: boolean;
   method: string;
   onMethodChange: (method: string) => void;
+  canCompare?: boolean;
   centered?: boolean;
 }
 
@@ -23,6 +24,7 @@ export default function ChatInput({
   isLoading,
   method,
   onMethodChange,
+  canCompare = false,
   centered = false,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
@@ -66,7 +68,12 @@ export default function ChatInput({
     }
   };
 
-  const selectedMethod = METHODS.find((m) => m.value === method) || METHODS[0];
+  const availableMethods = canCompare
+    ? METHODS
+    : METHODS.filter((m) => m.value !== "compare");
+
+  const selectedMethod =
+    availableMethods.find((m) => m.value === method) || availableMethods[0];
 
   return (
     <form
@@ -118,7 +125,7 @@ export default function ChatInput({
                     Method
                   </span>
                 </div>
-                {METHODS.map((m) => (
+                {availableMethods.map((m) => (
                   <button
                     key={m.value}
                     type="button"

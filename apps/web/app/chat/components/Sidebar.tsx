@@ -41,7 +41,6 @@ const NAV_ITEMS = [
 
 const TIER_COLORS: Record<string, string> = {
   maya: "bg-text-secondary/15 text-text-secondary",
-  dhyan: "bg-accent/15 text-accent",
   moksha: "bg-yellow-500/15 text-yellow-600",
 };
 
@@ -54,6 +53,9 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
   const isLoadingUser = currentUser === undefined;
   const isSignedIn = !!currentUser;
   const tierBadgeClass = TIER_COLORS[subscription.tier] ?? TIER_COLORS.maya;
+  const tierBadgeLabel = subscription.isUnlimited
+    ? "moksha"
+    : `${subscription.messagesAvailable ?? 0} msgs`;
 
   return (
     <>
@@ -88,7 +90,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
           </span>
           {/* Tier badge */}
           <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tierBadgeClass}`}>
-            {subscription.tier}
+            {tierBadgeLabel}
           </span>
         </div>
 
@@ -142,14 +144,19 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
                   </p>
                 </div>
               </div>
-              {subscription.tier !== "maya" && (
+              <p className="mb-2 text-[11px] text-text-secondary/70">
+                {subscription.isUnlimited
+                  ? "Unlimited messages active"
+                  : `${subscription.messagesAvailable ?? 0} messages available`}
+              </p>
+              {currentUser && (
                 <Link
                   href="/settings"
                   onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
                   className="flex items-center gap-1.5 text-[11px] text-accent hover:underline mb-2"
                 >
                   <Crown className="h-3 w-3" />
-                  Manage subscription
+                  Billing & purchases
                 </Link>
               )}
               <button

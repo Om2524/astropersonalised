@@ -1,0 +1,11 @@
+{
+  "name": "sudarshan",
+  "private": true,
+  "packageManager": "pnpm@10.31.0",
+  "dependencies": {
+    "@auth/core": "^0.37.0",
+    "@convex-dev/auth": "^0.0.91",
+    "@convex-dev/polar": "^0.8.1",
+    "convex": "^1.32.0"
+  }
+}

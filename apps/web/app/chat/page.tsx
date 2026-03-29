@@ -151,6 +151,12 @@ export default function ChatPage() {
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!subscription.canCompare && method === "compare") {
+      setMethod("vedic");
+    }
+  }, [method, subscription.canCompare]);
+
   const requiresLoginToContinue =
     currentUser === null && (subscription.used > 0 || hasConsumedAnonymousQuery);
 
@@ -208,6 +214,7 @@ export default function ChatPage() {
         const authResult = await authorizeStreamAction({
           sessionId,
           userId: currentUser?._id ?? undefined,
+          usageKey: assistantId,
           query,
           method,
         });
@@ -226,7 +233,7 @@ export default function ChatPage() {
                     ...m,
                     content:
                       authResult.message ||
-                      "You have reached your query limit for this week.",
+                      "You’re out of messages right now.",
                   }
                 : m
             )
@@ -539,16 +546,18 @@ export default function ChatPage() {
                 isLoading={isLoading}
                 method={method}
                 onMethodChange={setMethod}
+                canCompare={subscription.canCompare}
                 centered
               />
               {/* Usage indicator */}
               {!subscription.loading && (
                 <div className="mt-2 flex justify-end">
                   <UsageIndicator
-                    used={subscription.used}
-                    limit={subscription.limit}
-                    remaining={subscription.remaining}
+                    messagesAvailable={subscription.messagesAvailable}
+                    freeRemaining={subscription.freeRemaining}
+                    creditBalance={subscription.creditBalance}
                     tier={subscription.tier}
+                    isUnlimited={subscription.isUnlimited}
                     resetsAt={subscription.resetsAt}
                   />
                 </div>
@@ -666,14 +675,16 @@ export default function ChatPage() {
                   isLoading={isLoading}
                   method={method}
                   onMethodChange={setMethod}
+                  canCompare={subscription.canCompare}
                 />
                 {!subscription.loading && (
                   <div className="mt-1 flex justify-end">
                     <UsageIndicator
-                      used={subscription.used}
-                      limit={subscription.limit}
-                      remaining={subscription.remaining}
+                      messagesAvailable={subscription.messagesAvailable}
+                      freeRemaining={subscription.freeRemaining}
+                      creditBalance={subscription.creditBalance}
                       tier={subscription.tier}
+                      isUnlimited={subscription.isUnlimited}
                       resetsAt={subscription.resetsAt}
                     />
                   </div>

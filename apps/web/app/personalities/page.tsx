@@ -81,8 +81,9 @@ export default function PersonalitiesPage() {
     (async () => {
       try {
         const data = await personalityMatchAction({
+          sessionId,
+          userId: currentUser?._id ?? undefined,
           chartData: chartRaw,
-          tier: subscription.tier,
         });
         if (!cancelled) {
           const result = data as Record<string, unknown>;
@@ -99,7 +100,7 @@ export default function PersonalitiesPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [chart, chartRaw, router, personalityMatchAction, subscription.tier]);
+  }, [chart, chartRaw, currentUser?._id, personalityMatchAction, router, sessionId]);
 
   if (!chart) return null;
 

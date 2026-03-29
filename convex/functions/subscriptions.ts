@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { polar } from "../polar";
+import { isUnlimitedSubscriptionKey } from "../billingConfig";
 
 /** Default tier for unauthenticated or free users. */
 const DEFAULT_TIER = "maya";
@@ -11,9 +12,9 @@ const DEFAULT_TIER = "maya";
  * Resolution order:
  * 1. If no userId (anonymous): return "maya"
  * 2. Check Polar subscription via the Polar component
- * 3. If active subscription with productKey: return that tier
- * 4. If past_due: keep current tier for grace period
- * 5. If canceled but not expired: keep tier until period end
+ * 3. If active premium subscription exists: return "moksha"
+ * 4. If past_due: keep premium access for grace period
+ * 5. If canceled but not expired: keep premium access until period end
  * 6. If revoked or no subscription: return "maya"
  *
  * @param sessionId - The anonymous session UUID
@@ -54,11 +55,14 @@ export const getCurrentTier = query({
       // Resolve tier from productKey
       const productKey = subscription.productKey as string | undefined;
       const status = subscription.status;
+      const premiumTier = isUnlimitedSubscriptionKey(productKey)
+        ? "moksha"
+        : DEFAULT_TIER;
 
-      // Active or trialing subscription — use the product tier
+      // Active or trialing subscription — premium users map to Moksha.
       if (status === "active" || status === "trialing") {
         return {
-          tier: productKey ?? DEFAULT_TIER,
+          tier: premiumTier,
           sessionId,
           isAuthenticated: true,
           subscription: {
@@ -72,7 +76,7 @@ export const getCurrentTier = query({
       // Past due — grace period, keep current tier
       if (status === "past_due") {
         return {
-          tier: productKey ?? DEFAULT_TIER,
+          tier: premiumTier,
           sessionId,
           isAuthenticated: true,
           subscription: {
@@ -88,7 +92,7 @@ export const getCurrentTier = query({
         const periodEnd = new Date(subscription.currentPeriodEnd).getTime();
         if (Date.now() < periodEnd) {
           return {
-            tier: productKey ?? DEFAULT_TIER,
+            tier: premiumTier,
             sessionId,
             isAuthenticated: true,
             subscription: {

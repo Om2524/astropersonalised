@@ -52,6 +52,8 @@ export default function WeeklyOutlookPage() {
     setLoading(true); setError(null);
     try {
       const data = await weeklyOutlookAction({
+        sessionId,
+        userId: currentUser?._id ?? undefined,
         chartData: chartRaw,
         tone: tone || "practical",
         weekStart: ws,
@@ -60,7 +62,7 @@ export default function WeeklyOutlookPage() {
     }
     catch (err) { setError((err as Error).message || "Failed to load weekly outlook"); }
     finally { setLoading(false); }
-  }, [chartRaw, tone, weeklyOutlookAction]);
+  }, [chartRaw, currentUser?._id, sessionId, tone, weeklyOutlookAction]);
 
   useEffect(() => {
     if (chartRaw && subscription.canWeekly) fetchOutlook(weekStart);
@@ -78,7 +80,7 @@ export default function WeeklyOutlookPage() {
     );
   }
 
-  // Gate behind Dhyan/Moksha tier
+  // Gate behind Moksha
   if (!subscription.loading && !subscription.canWeekly) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4">
@@ -86,7 +88,7 @@ export default function WeeklyOutlookPage() {
           <Lock className="mx-auto h-12 w-12 text-text-secondary/30 mb-4" />
           <h2 className="mb-2 text-xl font-semibold text-text-primary">Weekly Outlook</h2>
           <p className="mb-6 text-sm text-text-secondary">
-            Weekly outlook is available on Dhyan and Moksha plans.
+            Weekly outlook is part of Moksha Unlimited.
           </p>
           <Link href="/pricing" className="inline-block rounded-xl bg-accent px-6 py-2.5 text-sm font-medium text-white hover:brightness-110">
             View Plans

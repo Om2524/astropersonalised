@@ -22,8 +22,7 @@ const TONE_OPTIONS: { value: UserProfile["tone"]; label: string; description: st
 
 const TIER_LABELS: Record<string, string> = {
   maya: "Maya (Free)",
-  dhyan: "Dhyan ($100/mo)",
-  moksha: "Moksha ($1,000/mo)",
+  moksha: "Moksha Unlimited",
 };
 
 export default function SettingsPage() {
@@ -34,7 +33,6 @@ export default function SettingsPage() {
   const computeChartAction = useAction(api.actions.computeChart.computeChart);
   const updateTone = useMutation(api.functions.birthProfiles.updateTone);
   const generatePortalUrl = useAction(api.polar.generateCustomerPortalUrl);
-  const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const [dob, setDob] = useState(profile?.date_of_birth ?? "");
@@ -112,13 +110,13 @@ export default function SettingsPage() {
 
         <h1 className="text-2xl font-semibold text-text-primary mb-8">Settings</h1>
 
-        {/* Subscription */}
+        {/* Billing */}
         <section className="glass-section p-5 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Crown size={18} className="text-accent" />
-            <h2 className="text-lg font-semibold text-text-primary">Subscription</h2>
+            <h2 className="text-lg font-semibold text-text-primary">Billing</h2>
           </div>
-          <p className="text-xs text-text-secondary mb-4">Manage your plan and billing.</p>
+          <p className="text-xs text-text-secondary mb-4">Manage your plan, message packs, and Polar purchases.</p>
 
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-text-secondary">Current plan</span>
@@ -127,38 +125,41 @@ export default function SettingsPage() {
             </span>
           </div>
 
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-text-secondary">Queries this week</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-text-secondary">Messages available</span>
             <span className="text-sm font-medium text-text-primary">
-              {subscription.used} / {subscription.limit}
+              {subscription.isUnlimited
+                ? "Unlimited"
+                : subscription.messagesAvailable ?? 0}
             </span>
           </div>
 
-          {/* Usage bar */}
-          <div className="w-full h-2 rounded-full bg-black/5 overflow-hidden mb-4">
-            <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
-              style={{ width: `${subscription.limit > 0 ? Math.min(100, (subscription.used / subscription.limit) * 100) : 0}%` }}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-text-secondary">Allowance breakdown</span>
+            <span className="text-sm font-medium text-text-primary">
+              {subscription.isUnlimited
+                ? "All premium features unlocked"
+                : `${subscription.freeRemaining} free + ${subscription.creditBalance} bundle`}
+            </span>
           </div>
 
           <div className="flex gap-3">
-            {subscription.tier === "maya" && (
+            {!subscription.isUnlimited && (
               <Link
                 href="/pricing"
                 className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 transition"
               >
-                <Sparkles size={14} /> Upgrade Plan
+                <Sparkles size={14} /> Buy Messages
               </Link>
             )}
-            {subscription.tier !== "maya" && (
+            {!!currentUser && (
               <button
                 type="button"
                 onClick={handleManageBilling}
                 disabled={portalLoading}
                 className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/20 px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-white/30 transition disabled:opacity-50"
               >
-                {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Manage Billing
+                {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Billing & Purchases
               </button>
             )}
           </div>
