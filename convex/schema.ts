@@ -106,7 +106,7 @@ const schema = defineSchema({
   queryUsage: defineTable({
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
-    usageKey: v.string(),
+    usageKey: v.optional(v.string()),
     queriedAt: v.number(),
   })
     .index("by_sessionId", ["sessionId", "queriedAt"])
