@@ -151,14 +151,7 @@ export default function ChatPage() {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    if (!subscription.canCompare && method === "compare") {
-      setMethod("vedic");
-    }
-  }, [method, subscription.canCompare]);
-
-  const requiresLoginToContinue =
-    currentUser === null && (subscription.used > 0 || hasConsumedAnonymousQuery);
+  const requiresLoginToContinue = false;
 
   useEffect(() => {
     if (

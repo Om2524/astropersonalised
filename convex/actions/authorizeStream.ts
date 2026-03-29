@@ -4,7 +4,6 @@ import { api } from "../_generated/api";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
-const ANONYMOUS_PREVIEW_LIMIT = 1;
 type PublicAction = ReturnType<typeof action>;
 type AuthorizeStreamArgs = {
   sessionId: string;
@@ -98,79 +97,12 @@ export const authorizeStream: PublicAction = action({
       tier: tierInfo.tier,
     });
 
-    if (args.method === "compare" && tierInfo.tier !== "moksha") {
-      return {
-        success: false,
-        error: "feature_locked",
-        message: "Compare All is part of Moksha Unlimited.",
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-        token: null,
-        expiresAt: null,
-        streamUrl: null,
-      };
-    }
-
-    // 3. If out of messages, return an upgrade / purchase prompt
-    if (!usage.allowed) {
-      return {
-        success: false,
-        error: "rate_limit_exceeded",
-        message:
-          "You’re out of messages. Buy a 50-message pack or go Moksha Unlimited.",
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-        token: null,
-        expiresAt: null,
-        streamUrl: null,
-      };
-    }
-
-    if (!args.userId && usage.used >= ANONYMOUS_PREVIEW_LIMIT) {
-      return {
-        success: false,
-        error: "auth_required",
-        message:
-          "Sign in to continue this conversation and save your astrology profile.",
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-        token: null,
-        expiresAt: null,
-        streamUrl: null,
-      };
-    }
-
-    // 4. Record free usage or spend one paid credit
-    if (usage.nextConsumeSource === "free") {
-      await ctx.runMutation(api.functions.queryUsage.recordUsage, {
-        sessionId: args.sessionId,
-        userId: args.userId,
-        usageKey: args.usageKey,
-      });
-    } else if (usage.nextConsumeSource === "credit") {
-      if (!args.userId) {
-        throw new Error("Authenticated user required to spend message credits");
-      }
-      await ctx.runMutation(api.functions.queryUsage.recordCreditSpend, {
-        userId: args.userId,
-        usageKey: args.usageKey,
-      });
-    }
+    // Record usage for analytics (no limits enforced)
+    await ctx.runMutation(api.functions.queryUsage.recordUsage, {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      usageKey: args.usageKey,
+    });
 
     // 5. Generate HMAC-SHA256 token
     const secret = process.env.STREAM_TOKEN_SECRET;
@@ -233,14 +165,10 @@ export const authorizeStream: PublicAction = action({
       expiresAt,
       streamUrl: `${computeUrl}/v1/reading/stream`,
       usage: {
-        used:
-          usage.nextConsumeSource === "free" ? usage.used + 1 : usage.used,
+        used: usage.used,
         limit: usage.limit,
-        remaining:
-          usage.remaining === null
-            ? null
-            : Math.max(0, usage.remaining - 1),
-        resetsAt: usage.resetsAt,
+        remaining: null,
+        resetsAt: null,
       },
       tier: tierInfo.tier,
       error: null,

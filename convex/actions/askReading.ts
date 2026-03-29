@@ -92,54 +92,12 @@ export const askReading: PublicAction = action({
       tier: tierInfo.tier,
     });
 
-    if (args.method === "compare" && tierInfo.tier !== "moksha") {
-      return {
-        success: false,
-        error: "feature_locked",
-        message: "Compare All is part of Moksha Unlimited.",
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-      };
-    }
-
-    // 3. If out of messages, return a purchase / upgrade prompt
-    if (!usage.allowed) {
-      return {
-        success: false,
-        error: "rate_limit_exceeded",
-        message:
-          "You’re out of messages. Buy a 50-message pack or go Moksha Unlimited.",
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-      };
-    }
-
-    // 4. Record free usage or spend one paid credit
-    if (usage.nextConsumeSource === "free") {
-      await ctx.runMutation(api.functions.queryUsage.recordUsage, {
-        sessionId: args.sessionId,
-        userId: args.userId,
-        usageKey: args.usageKey,
-      });
-    } else if (usage.nextConsumeSource === "credit") {
-      if (!args.userId) {
-        throw new Error("Authenticated user required to spend message credits");
-      }
-      await ctx.runMutation(api.functions.queryUsage.recordCreditSpend, {
-        userId: args.userId,
-        usageKey: args.usageKey,
-      });
-    }
+    // Record usage for analytics (no limits enforced)
+    await ctx.runMutation(api.functions.queryUsage.recordUsage, {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      usageKey: args.usageKey,
+    });
 
     // 5. Call Python API
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
@@ -203,14 +161,10 @@ export const askReading: PublicAction = action({
       readingId,
       reading: readingResponse,
       usage: {
-        used:
-          usage.nextConsumeSource === "free" ? usage.used + 1 : usage.used,
+        used: usage.used,
         limit: usage.limit,
-        remaining:
-          usage.remaining === null
-            ? null
-            : Math.max(0, usage.remaining - 1),
-        resetsAt: usage.resetsAt,
+        remaining: null,
+        resetsAt: null,
       },
       tier: tierInfo.tier,
     };

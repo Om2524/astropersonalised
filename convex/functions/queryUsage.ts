@@ -22,78 +22,19 @@ export const checkLimit = query({
     userId: v.optional(v.id("users")),
     tier: v.string(),
   },
-  handler: async (ctx, { sessionId, userId, tier }) => {
-    const unlimited = isUnlimitedTier(tier);
-    const windowStart = Date.now() - SEVEN_DAYS_MS;
-
-    const freeUsageRecords = userId
-      ? await ctx.db
-          .query("queryUsage")
-          .withIndex("by_userId", (q) =>
-            q.eq("userId", userId).gt("queriedAt", windowStart)
-          )
-          .collect()
-      : await ctx.db
-          .query("queryUsage")
-          .withIndex("by_sessionId", (q) =>
-            q.eq("sessionId", sessionId).gt("queriedAt", windowStart)
-          )
-          .collect();
-
-    const used = freeUsageRecords.length;
-    const freeRemaining = unlimited
-      ? FREE_WEEKLY_MESSAGE_LIMIT
-      : Math.max(0, FREE_WEEKLY_MESSAGE_LIMIT - used);
-
-    let creditBalance = 0;
-    if (userId && !unlimited) {
-      const [grants, spends] = await Promise.all([
-        ctx.db
-          .query("messageCreditGrants")
-          .withIndex("by_userId", (q) => q.eq("userId", userId))
-          .collect(),
-        ctx.db
-          .query("messageCreditSpends")
-          .withIndex("by_userId", (q) => q.eq("userId", userId))
-          .collect(),
-      ]);
-
-      const grantedCredits = grants.reduce((sum, grant) => {
-        return grant.status === "credited" ? sum + grant.credits : sum;
-      }, 0);
-
-      creditBalance = Math.max(0, grantedCredits - spends.length);
-    }
-
-    let resetsAt: number | null = null;
-    if (freeRemaining === 0 && freeUsageRecords.length > 0) {
-      const earliest = freeUsageRecords.reduce(
-        (min, record) => (record.queriedAt < min ? record.queriedAt : min),
-        freeUsageRecords[0].queriedAt
-      );
-      resetsAt = earliest + SEVEN_DAYS_MS;
-    }
-
-    const messagesAvailable = unlimited ? null : freeRemaining + creditBalance;
-    const nextConsumeSource = unlimited
-      ? "unlimited"
-      : freeRemaining > 0
-        ? "free"
-        : creditBalance > 0
-          ? "credit"
-          : "none";
-
+  handler: async (_ctx, { sessionId: _s, userId: _u, tier: _t }) => {
+    // All limits removed — every user gets unlimited access.
     return {
-      allowed: unlimited || (messagesAvailable ?? 0) > 0,
-      used,
+      allowed: true,
+      used: 0,
       limit: FREE_WEEKLY_MESSAGE_LIMIT,
-      remaining: messagesAvailable,
-      resetsAt,
-      freeRemaining,
-      creditBalance,
-      messagesAvailable,
-      isUnlimited: unlimited,
-      nextConsumeSource,
+      remaining: null,
+      resetsAt: null,
+      freeRemaining: FREE_WEEKLY_MESSAGE_LIMIT,
+      creditBalance: 0,
+      messagesAvailable: null,
+      isUnlimited: true,
+      nextConsumeSource: "unlimited" as const,
     };
   },
 });
