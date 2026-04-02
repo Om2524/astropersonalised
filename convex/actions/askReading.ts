@@ -1,18 +1,51 @@
 "use node";
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import type { Id } from "../_generated/dataModel";
+
+type PublicAction = ReturnType<typeof action>;
+type AskReadingArgs = {
+  sessionId: string;
+  userId?: Id<"users">;
+  usageKey: string;
+  query: string;
+  method: string;
+  chartData: string;
+  tone?: string;
+};
+
+type UsageSnapshot = {
+  used: number;
+  limit: number;
+  remaining: number | null;
+  resetsAt: number | null;
+};
+
+type AskReadingResult =
+  | {
+      success: false;
+      error: string;
+      message: string;
+      usage: UsageSnapshot;
+      tier: string;
+    }
+  | {
+      success: true;
+      readingId: Id<"readings">;
+      reading: unknown;
+      usage: UsageSnapshot;
+      tier: string;
+    };
 
 /**
  * Ask the astrology AI a question and get a structured reading.
  *
  * Flow:
  * 1. Resolve the user's subscription tier
- * 2. Check rate limit (rolling 7-day window)
+ * 2. Check message entitlement
  * 3. If not allowed: return error with usage info and upgrade prompt
- * 4. Record usage
+ * 4. Record free usage or spend one paid credit
  * 5. Call Python API POST /v1/reading/ask
  * 6. Store the reading result
  * 7. Return result with usage stats
@@ -29,26 +62,20 @@ import type { Id } from "../_generated/dataModel";
  * @param tone - Preferred reading tone
  * @returns The reading result with usage stats
  */
-export const askReading = action({
+export const askReading: PublicAction = action({
   args: {
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
+    usageKey: v.string(),
     query: v.string(),
     method: v.string(),
     chartData: v.string(),
     tone: v.optional(v.string()),
   },
   handler: async (
-    ctx: GenericActionCtx<GenericDataModel>,
-    args: {
-      sessionId: string;
-      userId?: Id<"users">;
-      query: string;
-      method: string;
-      chartData: string;
-      tone?: string;
-    }
-  ) => {
+    ctx: ActionCtx,
+    args: AskReadingArgs
+  ): Promise<AskReadingResult> => {
     // 1. Resolve tier
     const tierInfo = await ctx.runQuery(
       api.functions.subscriptions.getCurrentTier,
@@ -58,39 +85,18 @@ export const askReading = action({
       }
     );
 
-    // 2. Check rate limit
+    // 2. Check message entitlement
     const usage = await ctx.runQuery(api.functions.queryUsage.checkLimit, {
       sessionId: args.sessionId,
       userId: args.userId,
       tier: tierInfo.tier,
     });
 
-    // 3. If rate limited, return error
-    if (!usage.allowed) {
-      return {
-        success: false,
-        error: "rate_limit_exceeded",
-        message: `You have used all ${usage.limit} queries for this week. ${
-          tierInfo.tier === "maya"
-            ? "Upgrade to Dhyan for 50 queries/week or Moksha for 500 queries/week."
-            : tierInfo.tier === "dhyan"
-              ? "Upgrade to Moksha for 500 queries/week."
-              : "Your limit resets soon."
-        }`,
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-      };
-    }
-
-    // 4. Record usage (before API call to ensure accurate counting)
+    // Record usage for analytics (no limits enforced)
     await ctx.runMutation(api.functions.queryUsage.recordUsage, {
       sessionId: args.sessionId,
       userId: args.userId,
+      usageKey: args.usageKey,
     });
 
     // 5. Call Python API
@@ -155,10 +161,10 @@ export const askReading = action({
       readingId,
       reading: readingResponse,
       usage: {
-        used: usage.used + 1,
+        used: usage.used,
         limit: usage.limit,
-        remaining: Math.max(0, usage.remaining - 1),
-        resetsAt: usage.resetsAt,
+        remaining: null,
+        resetsAt: null,
       },
       tier: tierInfo.tier,
     };

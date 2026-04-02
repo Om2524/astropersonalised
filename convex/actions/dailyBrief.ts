@@ -5,8 +5,8 @@ import { v } from "convex/values";
 /**
  * Generate a personalized daily brief via the Python Shastra Compute API.
  *
- * No rate limiting on daily briefs — they are a retention feature
- * available to all tiers (basic for Maya, full for Dhyan/Moksha).
+ * No message metering on daily briefs — they are a retention feature
+ * available to all tiers (basic for Maya, full for Moksha).
  *
  * @param chartData - JSON string of the canonical chart
  * @param tone - Preferred reading tone

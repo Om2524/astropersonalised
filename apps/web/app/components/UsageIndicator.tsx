@@ -3,72 +3,63 @@
 import Link from "next/link";
 
 interface UsageIndicatorProps {
-  used: number;
-  limit: number;
-  remaining: number;
+  messagesAvailable: number | null;
+  freeRemaining: number;
+  creditBalance: number;
   tier: string;
+  isUnlimited: boolean;
   resetsAt: number | null;
 }
 
 export default function UsageIndicator({
-  used,
-  limit,
-  remaining,
+  messagesAvailable,
+  freeRemaining,
+  creditBalance,
   tier,
+  isUnlimited,
   resetsAt,
 }: UsageIndicatorProps) {
-  const percentage = limit > 0 ? Math.round((used / limit) * 100) : 0;
-  const isExhausted = remaining <= 0;
-  const isLow = remaining > 0 && remaining <= Math.ceil(limit * 0.2);
-
   let resetLabel = "";
   if (resetsAt) {
     const diff = resetsAt - Date.now();
     if (diff > 0) {
       const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      resetLabel = days === 1 ? "Resets in 1 day" : `Resets in ${days} days`;
+      resetLabel = days === 1 ? "Free allowance resets in 1 day" : `Free allowance resets in ${days} days`;
     }
   }
 
+  if (isUnlimited) {
+    return (
+      <div className="flex items-center gap-2 text-[11px]">
+        <span className="rounded-full bg-yellow-500/12 px-2 py-0.5 font-medium text-yellow-600">
+          Unlimited messages
+        </span>
+      </div>
+    );
+  }
+
+  const exhausted = (messagesAvailable ?? 0) <= 0;
+  const secondaryLabel = creditBalance > 0
+    ? `${freeRemaining} free + ${creditBalance} bundle`
+    : `${freeRemaining} free this week`;
+
   return (
     <div className="flex items-center gap-2 text-[11px]">
-      {/* Progress bar */}
-      <div className="w-16 h-1.5 rounded-full bg-black/8 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            isExhausted
-              ? "bg-red-500"
-              : isLow
-                ? "bg-yellow-500"
-                : "bg-accent"
-          }`}
-          style={{ width: `${Math.min(100, percentage)}%` }}
-        />
-      </div>
-
-      {/* Label */}
       <span
-        className={`select-none ${
-          isExhausted
-            ? "text-red-500 font-medium"
-            : "text-text-secondary/50"
-        }`}
+        className={`select-none ${exhausted ? "text-red-500 font-medium" : "text-text-secondary/60"}`}
       >
-        {remaining}/{limit} left
+        {(messagesAvailable ?? 0)} messages left
       </span>
 
-      {/* Reset info */}
-      {resetLabel && isExhausted && (
-        <span className="text-text-secondary/40">{resetLabel}</span>
+      <span className="text-text-secondary/35">{secondaryLabel}</span>
+
+      {resetLabel && exhausted && (
+        <span className="text-text-secondary/35">{resetLabel}</span>
       )}
 
-      {/* Upgrade link */}
-      {isExhausted && tier === "maya" && (
-        <Link
-          href="/pricing"
-          className="text-accent font-medium hover:underline"
-        >
-          Upgrade
+      {exhausted && tier === "maya" && (
+        <Link href="/pricing" className="text-accent font-medium hover:underline">
+          Buy pack
         </Link>
       )}
     </div>

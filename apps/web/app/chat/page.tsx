@@ -17,6 +17,7 @@ import HouseRelevance from "./components/HouseRelevance";
 import DashaBadge from "./components/DashaBadge";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
+import AuthWall from "@/app/components/AuthWall";
 
 /**
  * Split streaming content into main body and "Explore Further" questions.
@@ -122,6 +123,9 @@ export default function ChatPage() {
   const [method, setMethod] = useState<string>("vedic");
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAuthWall, setShowAuthWall] = useState(false);
+  const [hasConsumedAnonymousQuery, setHasConsumedAnonymousQuery] = useState(false);
+  const [hasShownAuthPrompt, setHasShownAuthPrompt] = useState(false);
   const [ledgerSteps, setLedgerSteps] = useState<
     { step: number; message: string }[]
   >([]);
@@ -140,9 +144,40 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, ledgerSteps, scrollToBottom]);
 
+  useEffect(() => {
+    if (currentUser) {
+      setHasConsumedAnonymousQuery(false);
+      setHasShownAuthPrompt(false);
+    }
+  }, [currentUser]);
+
+  const requiresLoginToContinue = false;
+
+  useEffect(() => {
+    if (
+      !isLoading &&
+      messages.length > 0 &&
+      requiresLoginToContinue &&
+      !hasShownAuthPrompt
+    ) {
+      setShowAuthWall(true);
+      setHasShownAuthPrompt(true);
+    }
+  }, [
+    hasShownAuthPrompt,
+    isLoading,
+    messages.length,
+    requiresLoginToContinue,
+  ]);
+
   const handleSubmit = useCallback(
     async (query: string) => {
-      if (isLoading) return;
+      if (isLoading || currentUser === undefined) return;
+
+      if (requiresLoginToContinue) {
+        setShowAuthWall(true);
+        return;
+      }
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -172,11 +207,17 @@ export default function ChatPage() {
         const authResult = await authorizeStreamAction({
           sessionId,
           userId: currentUser?._id ?? undefined,
+          usageKey: assistantId,
           query,
           method,
         });
 
         if (!authResult.success || !authResult.token || !authResult.streamUrl) {
+          if (authResult.error === "auth_required") {
+            setHasConsumedAnonymousQuery(true);
+            setShowAuthWall(true);
+          }
+
           // Rate limited or error
           setMessages((prev) =>
             prev.map((m) =>
@@ -185,7 +226,7 @@ export default function ChatPage() {
                     ...m,
                     content:
                       authResult.message ||
-                      "You have reached your query limit for this week.",
+                      "You’re out of messages right now.",
                   }
                 : m
             )
@@ -193,6 +234,10 @@ export default function ChatPage() {
           setIsLoading(false);
           setLedgerComplete(true);
           return;
+        }
+
+        if (currentUser === null) {
+          setHasConsumedAnonymousQuery(true);
         }
 
         // Open SSE connection directly to the Python API
@@ -434,6 +479,8 @@ export default function ChatPage() {
       chartRaw,
       tone,
       currentUser?._id,
+      currentUser,
+      requiresLoginToContinue,
       authorizeStreamAction,
       storeReading,
       streamBuffer,
@@ -492,16 +539,18 @@ export default function ChatPage() {
                 isLoading={isLoading}
                 method={method}
                 onMethodChange={setMethod}
+                canCompare={subscription.canCompare}
                 centered
               />
               {/* Usage indicator */}
               {!subscription.loading && (
                 <div className="mt-2 flex justify-end">
                   <UsageIndicator
-                    used={subscription.used}
-                    limit={subscription.limit}
-                    remaining={subscription.remaining}
+                    messagesAvailable={subscription.messagesAvailable}
+                    freeRemaining={subscription.freeRemaining}
+                    creditBalance={subscription.creditBalance}
                     tier={subscription.tier}
+                    isUnlimited={subscription.isUnlimited}
                     resetsAt={subscription.resetsAt}
                   />
                 </div>
@@ -619,14 +668,16 @@ export default function ChatPage() {
                   isLoading={isLoading}
                   method={method}
                   onMethodChange={setMethod}
+                  canCompare={subscription.canCompare}
                 />
                 {!subscription.loading && (
                   <div className="mt-1 flex justify-end">
                     <UsageIndicator
-                      used={subscription.used}
-                      limit={subscription.limit}
-                      remaining={subscription.remaining}
+                      messagesAvailable={subscription.messagesAvailable}
+                      freeRemaining={subscription.freeRemaining}
+                      creditBalance={subscription.creditBalance}
                       tier={subscription.tier}
+                      isUnlimited={subscription.isUnlimited}
                       resetsAt={subscription.resetsAt}
                     />
                   </div>
@@ -636,6 +687,12 @@ export default function ChatPage() {
           </>
         )}
       </main>
+
+      <AuthWall
+        isOpen={showAuthWall}
+        onClose={() => setShowAuthWall(false)}
+        reason="Sign in to continue your reading"
+      />
     </div>
   );
 }

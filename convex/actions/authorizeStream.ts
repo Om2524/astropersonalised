@@ -1,9 +1,46 @@
 "use node";
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import type { Id } from "../_generated/dataModel";
+
+type PublicAction = ReturnType<typeof action>;
+type AuthorizeStreamArgs = {
+  sessionId: string;
+  userId?: Id<"users">;
+  usageKey: string;
+  query: string;
+  method: string;
+};
+
+type UsageSnapshot = {
+  used: number;
+  limit: number;
+  remaining: number | null;
+  resetsAt: number | null;
+};
+
+type AuthorizeStreamResult =
+  | {
+      success: false;
+      error: string;
+      message: string;
+      usage: UsageSnapshot;
+      tier: string;
+      token: null;
+      expiresAt: null;
+      streamUrl: null;
+    }
+  | {
+      success: true;
+      token: string;
+      expiresAt: number;
+      streamUrl: string;
+      usage: UsageSnapshot;
+      tier: string;
+      error: null;
+      message: null;
+    };
 
 /**
  * Authorize a streaming reading connection.
@@ -13,9 +50,9 @@ import type { Id } from "../_generated/dataModel";
  *
  * Flow:
  * 1. Resolve the user's subscription tier
- * 2. Check rate limit (rolling 7-day window)
+ * 2. Check message entitlement (free weekly allowance, credits, or Moksha)
  * 3. If not allowed: return error with usage info
- * 4. Record usage
+ * 4. Record free usage or spend one paid credit
  * 5. Generate HMAC-SHA256 signed token with 60-second expiry
  * 6. Return token, expiry, stream URL, and usage stats
  *
@@ -32,22 +69,18 @@ import type { Id } from "../_generated/dataModel";
  * @param method - "vedic", "kp", "western", or "compare"
  * @returns Token, expiry, stream URL, and usage stats
  */
-export const authorizeStream = action({
+export const authorizeStream: PublicAction = action({
   args: {
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
+    usageKey: v.string(),
     query: v.string(),
     method: v.string(),
   },
   handler: async (
-    ctx: GenericActionCtx<GenericDataModel>,
-    args: {
-      sessionId: string;
-      userId?: Id<"users">;
-      query: string;
-      method: string;
-    }
-  ) => {
+    ctx: ActionCtx,
+    args: AuthorizeStreamArgs
+  ): Promise<AuthorizeStreamResult> => {
     // 1. Resolve tier
     const tierInfo = await ctx.runQuery(
       api.functions.subscriptions.getCurrentTier,
@@ -57,42 +90,18 @@ export const authorizeStream = action({
       }
     );
 
-    // 2. Check rate limit
+    // 2. Check message entitlement
     const usage = await ctx.runQuery(api.functions.queryUsage.checkLimit, {
       sessionId: args.sessionId,
       userId: args.userId,
       tier: tierInfo.tier,
     });
 
-    // 3. If rate limited, return error
-    if (!usage.allowed) {
-      return {
-        success: false,
-        error: "rate_limit_exceeded",
-        message: `You have used all ${usage.limit} queries for this week. ${
-          tierInfo.tier === "maya"
-            ? "Upgrade to Dhyan for 50 queries/week or Moksha for 500 queries/week."
-            : tierInfo.tier === "dhyan"
-              ? "Upgrade to Moksha for 500 queries/week."
-              : "Your limit resets soon."
-        }`,
-        usage: {
-          used: usage.used,
-          limit: usage.limit,
-          remaining: usage.remaining,
-          resetsAt: usage.resetsAt,
-        },
-        tier: tierInfo.tier,
-        token: null,
-        expiresAt: null,
-        streamUrl: null,
-      };
-    }
-
-    // 4. Record usage
+    // Record usage for analytics (no limits enforced)
     await ctx.runMutation(api.functions.queryUsage.recordUsage, {
       sessionId: args.sessionId,
       userId: args.userId,
+      usageKey: args.usageKey,
     });
 
     // 5. Generate HMAC-SHA256 token
@@ -156,10 +165,10 @@ export const authorizeStream = action({
       expiresAt,
       streamUrl: `${computeUrl}/v1/reading/stream`,
       usage: {
-        used: usage.used + 1,
+        used: usage.used,
         limit: usage.limit,
-        remaining: Math.max(0, usage.remaining - 1),
-        resetsAt: usage.resetsAt,
+        remaining: null,
+        resetsAt: null,
       },
       tier: tierInfo.tier,
       error: null,

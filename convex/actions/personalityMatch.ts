@@ -1,24 +1,45 @@
 "use node";
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
+import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+
+type PublicAction = ReturnType<typeof action>;
+
+type PersonalityMatchArgs = {
+  sessionId: string;
+  userId?: Id<"users">;
+  chartData: string;
+};
 
 /**
  * Find famous personality matches via the Python Shastra Compute API.
  *
- * No rate limiting on personality matches — the number of results
- * varies by tier (Maya: top 3, Dhyan: top 10, Moksha: top 50),
- * enforced by the Python API based on the tier parameter.
+ * No message metering on personality matches — the result depth varies by
+ * tier (Maya: top 3, Moksha: top 50), enforced by the Python API.
  *
  * @param chartData - JSON string of the canonical chart
  * @param tier - Current subscription tier (controls result count)
  * @returns Array of personality matches with resonance scores
  */
-export const personalityMatch = action({
+export const personalityMatch: PublicAction = action({
   args: {
+    sessionId: v.string(),
+    userId: v.optional(v.id("users")),
     chartData: v.string(),
-    tier: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx: ActionCtx,
+    args: PersonalityMatchArgs
+  ): Promise<unknown> => {
+    const tierInfo = await ctx.runQuery(
+      api.functions.subscriptions.getCurrentTier,
+      {
+        sessionId: args.sessionId,
+        userId: args.userId,
+      }
+    );
+
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
     const apiKey = process.env.SHASTRA_COMPUTE_API_KEY;
 
@@ -37,7 +58,7 @@ export const personalityMatch = action({
         },
         body: JSON.stringify({
           chart_data: JSON.parse(args.chartData).chart,
-          tier: args.tier ?? "maya",
+          tier: tierInfo.tier,
         }),
       });
 

@@ -6,82 +6,68 @@ import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import AuthWall from "@/app/components/AuthWall";
-import { Check, ArrowLeft, Loader2, Crown, Sparkles, Star } from "lucide-react";
+import {
+  Check,
+  ArrowLeft,
+  Loader2,
+  Crown,
+  Sparkles,
+  Star,
+  MessageCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-/**
- * Hardcoded Polar product IDs — these match the values in convex/polar.ts.
- * Using these directly avoids relying on getConfiguredProducts (which can
- * return empty when products haven't synced yet).
- */
-const PRODUCT_IDS: Record<string, string> = {
-  dhyan: "458d3978-f6e2-49e3-9a1b-c1d5b2425f32",
-  moksha: "25bb8519-70d3-4a1a-83b5-ae2befb2a654",
-};
-
-interface TierInfo {
-  key: string;
+interface OfferInfo {
+  key: "maya" | "messageBundle" | "moksha";
   name: string;
-  price: string;
-  period: string;
+  badge: string;
   description: string;
   icon: typeof Star;
-  features: string[];
   highlight?: boolean;
+  features: string[];
 }
 
-const TIERS: TierInfo[] = [
+const OFFERS: OfferInfo[] = [
   {
     key: "maya",
     name: "Maya",
-    price: "Free",
-    period: "",
-    description: "Begin your astrological journey",
+    badge: "Free",
+    description: "A gentle weekly allowance to explore your chart.",
     icon: Star,
     features: [
-      "5 queries per week",
-      "Daily brief (basic)",
-      "3 personality matches",
-      "Vedic + KP + Western",
+      "5 free messages per week",
+      "Daily brief",
       "Birth chart viewer",
+      "Top 3 personality matches",
     ],
   },
   {
-    key: "dhyan",
-    name: "Dhyan",
-    price: "$100",
-    period: "/month",
-    description: "Deep personalized insights",
-    icon: Sparkles,
+    key: "messageBundle",
+    name: "Message Pack",
+    badge: "One-time",
+    description: "Buy 50 additional messages whenever you need them.",
+    icon: MessageCircle,
     highlight: true,
     features: [
-      "50 queries per week",
-      "Daily brief (full depth)",
-      "Weekly outlook",
-      "10 personality matches",
-      "Compare All methods",
-      "Save and bookmark readings",
-      "Priority support",
+      "50 message credits",
+      "Works with Vedic, KP, and Western readings",
+      "Uses local pricing at checkout",
+      "Great for occasional deep dives",
     ],
   },
   {
     key: "moksha",
-    name: "Moksha",
-    price: "$1,000",
-    period: "/month",
-    description: "Ultimate cosmic clarity",
+    name: "Moksha Unlimited",
+    badge: "Premium",
+    description: "Unlimited messages and the full premium experience.",
     icon: Crown,
     features: [
-      "500 queries per week",
-      "Daily brief (full depth)",
+      "Unlimited messages",
+      "Compare All method access",
       "Weekly outlook",
-      "50 personality matches",
-      "Compare All methods",
-      "Save and bookmark readings",
-      "Priority support",
-      "Custom transit alerts",
-      "Extended reading history",
+      "Expanded personality matches",
+      "Priority billing support",
     ],
   },
 ];
@@ -91,23 +77,31 @@ export default function PricingPage() {
   const { isAuthenticated } = useConvexAuth();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
+  const configuredProducts = useQuery(api.polar.getConfiguredProducts, {});
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [loadingOffer, setLoadingOffer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAuthWall, setShowAuthWall] = useState(false);
 
-  async function handleSubscribe(tierKey: string) {
-    const productId = PRODUCT_IDS[tierKey];
-    if (!productId) return;
+  async function handleCheckout(productKey: "messageBundle" | "moksha") {
+    const productId =
+      productKey === "messageBundle"
+        ? configuredProducts?.dhyan?.id
+        : configuredProducts?.moksha?.id;
 
-    // Gate checkout behind authentication — Polar requires a user identity
+    if (!productId) {
+      setError("Checkout is still syncing. Please try again in a moment.");
+      return;
+    }
+
     if (!isAuthenticated) {
       setShowAuthWall(true);
       return;
     }
 
-    setLoadingTier(tierKey);
+    setLoadingOffer(productKey);
     setError(null);
+
     try {
       const checkoutPromise = generateCheckoutLink({
         productIds: [productId],
@@ -115,7 +109,6 @@ export default function PricingPage() {
         successUrl: window.location.origin + "/chat",
       });
 
-      // Race against a 15s timeout so the button doesn't hang forever
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("__timeout__")), 15_000)
       );
@@ -128,12 +121,12 @@ export default function PricingPage() {
       if (msg === "__timeout__") {
         setError("Checkout is taking too long. Please try again.");
       } else if (msg.includes("authenticated") || msg.includes("sign in")) {
-        setError("Please sign in to subscribe");
+        setError("Please sign in to purchase.");
         setShowAuthWall(true);
       } else {
         setError("Checkout failed. Please try again.");
       }
-      setLoadingTier(null);
+      setLoadingOffer(null);
     }
   }
 
@@ -152,65 +145,89 @@ export default function PricingPage() {
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             Choose Your Path
           </h1>
-          <p className="text-text-secondary max-w-md mx-auto">
-            Unlock deeper astrological insights with a premium plan
+          <p className="text-text-secondary max-w-2xl mx-auto">
+            Start with the free weekly allowance, buy messages when you need
+            more, or unlock Moksha for unlimited access. Polar shows local
+            pricing at checkout, including INR where available.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-          {TIERS.map((tier) => {
-            const isCurrent = subscription.tier === tier.key;
-            const Icon = tier.icon;
-            const productId = PRODUCT_IDS[tier.key] ?? null;
-            const isLoading = loadingTier === tier.key;
+          {OFFERS.map((offer) => {
+            const Icon = offer.icon;
+            const isMoksha = offer.key === "moksha";
+            const isCurrentMoksha = isMoksha && subscription.isUnlimited;
+            const isBundle = offer.key === "messageBundle";
+            const isLoading = loadingOffer === offer.key;
 
             return (
               <div
-                key={tier.key}
+                key={offer.key}
                 className={`glass-section p-6 flex flex-col transition-all ${
-                  tier.highlight
+                  offer.highlight
                     ? "border-accent/30 shadow-lg shadow-accent/5 scale-[1.02]"
                     : ""
                 }`}
               >
-                {/* Header */}
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon
                       size={20}
                       className={
-                        tier.highlight ? "text-accent" : "text-text-secondary"
+                        offer.highlight ? "text-accent" : "text-text-secondary"
                       }
                     />
                     <h2 className="text-lg font-semibold text-text-primary">
-                      {tier.name}
+                      {offer.name}
                     </h2>
-                    {isCurrent && (
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+                      {offer.badge}
+                    </span>
+                    {isCurrentMoksha && (
                       <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
                         Current
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-text-secondary">
-                    {tier.description}
+                    {offer.description}
                   </p>
                 </div>
 
-                {/* Price */}
                 <div className="mb-6">
-                  <span className="text-3xl font-bold text-text-primary">
-                    {tier.price}
-                  </span>
-                  {tier.period && (
-                    <span className="text-sm text-text-secondary">
-                      {tier.period}
+                  {offer.key === "maya" ? (
+                    <span className="text-3xl font-bold text-text-primary">
+                      Free
                     </span>
+                  ) : offer.key === "messageBundle" ? (
+                    <>
+                      <span className="text-3xl font-bold text-text-primary">
+                        50 messages
+                      </span>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        One-time purchase, localized at checkout
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-text-primary">
+                        Unlimited
+                      </span>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        Monthly plan, localized at checkout
+                      </p>
+                    </>
                   )}
                 </div>
 
-                {/* Features */}
+                {isBundle && !subscription.isUnlimited && (
+                  <div className="mb-4 rounded-xl border border-accent/15 bg-accent/5 px-3 py-2 text-xs text-accent">
+                    You currently have {subscription.messagesAvailable ?? 0} messages available.
+                  </div>
+                )}
+
                 <ul className="space-y-2.5 mb-6 flex-1">
-                  {tier.features.map((feature) => (
+                  {offer.features.map((feature) => (
                     <li
                       key={feature}
                       className="flex items-start gap-2 text-sm text-text-secondary"
@@ -224,27 +241,24 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                {/* CTA */}
-                {tier.key === "maya" ? (
-                  isCurrent ? (
-                    <div className="rounded-xl border border-accent/20 bg-accent/5 py-3 text-center text-sm font-medium text-accent">
-                      Current Plan
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-white/30 bg-white/15 py-3 text-center text-sm font-medium text-text-secondary">
-                      Free Forever
-                    </div>
-                  )
-                ) : isCurrent ? (
+                {offer.key === "maya" ? (
+                  <div className="rounded-xl border border-white/30 bg-white/15 py-3 text-center text-sm font-medium text-text-secondary">
+                    Included by default
+                  </div>
+                ) : isCurrentMoksha ? (
                   <div className="rounded-xl border border-accent/20 bg-accent/5 py-3 text-center text-sm font-medium text-accent">
                     Current Plan
                   </div>
-                ) : productId ? (
+                ) : (
                   <button
-                    onClick={() => handleSubscribe(tier.key)}
+                    onClick={() =>
+                      handleCheckout(
+                        offer.key as "messageBundle" | "moksha"
+                      )
+                    }
                     disabled={isLoading}
                     className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-                      tier.highlight
+                      offer.highlight
                         ? "bg-accent text-white hover:brightness-110"
                         : "bg-white/30 border border-white/40 text-text-primary hover:bg-white/50"
                     }`}
@@ -254,14 +268,13 @@ export default function PricingPage() {
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Redirecting...
                       </>
+                    ) : isBundle ? (
+                      "Buy 50 Messages"
                     ) : (
-                      <>
-                        Subscribe to {tier.name} — {tier.price}
-                        {tier.period}
-                      </>
+                      "Go Unlimited"
                     )}
                   </button>
-                ) : null}
+                )}
               </div>
             );
           })}
@@ -273,19 +286,16 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* Footer note */}
         <p className="mt-8 text-center text-xs text-text-secondary/50">
-          All plans include access to Vedic, KP, and Western astrology systems.
-          Payments processed securely via Polar.
+          Payments are processed securely via Polar. Apple Pay, Google Pay,
+          Link, and cards are handled at checkout based on availability.
         </p>
       </div>
 
-      {/* Auth wall modal for unauthenticated users */}
       <AuthWall
         isOpen={showAuthWall}
         onClose={() => setShowAuthWall(false)}
-        sessionId={sessionId}
-        reason="Sign in to subscribe"
+        reason="Sign in to purchase"
       />
     </div>
   );

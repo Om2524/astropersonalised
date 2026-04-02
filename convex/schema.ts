@@ -107,10 +107,43 @@ const schema = defineSchema({
   queryUsage: defineTable({
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
+    usageKey: v.optional(v.string()),
     queriedAt: v.number(),
   })
     .index("by_sessionId", ["sessionId", "queriedAt"])
-    .index("by_userId", ["userId", "queriedAt"]),
+    .index("by_userId", ["userId", "queriedAt"])
+    .index("by_usageKey", ["usageKey"]),
+
+  /**
+   * Paid message grants created from successful Polar one-time orders.
+   *
+   * Orders are stored separately from query usage so bundle credits
+   * can persist beyond the rolling free weekly allowance.
+   */
+  messageCreditGrants: defineTable({
+    orderId: v.string(),
+    userId: v.id("users"),
+    productId: v.string(),
+    credits: v.number(),
+    status: v.string(),
+    orderModifiedAt: v.number(),
+    grantedAt: v.number(),
+  })
+    .index("by_orderId", ["orderId"])
+    .index("by_userId", ["userId", "grantedAt"]),
+
+  /**
+   * One record per paid message consumed from a user's bundle balance.
+   *
+   * `usageKey` makes bundle spending idempotent across retries.
+   */
+  messageCreditSpends: defineTable({
+    usageKey: v.string(),
+    userId: v.id("users"),
+    spentAt: v.number(),
+  })
+    .index("by_usageKey", ["usageKey"])
+    .index("by_userId", ["userId", "spentAt"]),
 });
 
 export default schema;

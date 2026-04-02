@@ -48,18 +48,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const userId = currentUser?._id;
 
-  // Fetch birth profile from Convex
-  const birthProfile = useQuery(
+  const birthProfileBySession = useQuery(
     api.functions.birthProfiles.getBySession,
     sessionId ? { sessionId } : "skip"
   );
+  const birthProfileByUser = useQuery(
+    api.functions.birthProfiles.getByUser,
+    userId ? { userId } : "skip"
+  );
+  const birthProfile = birthProfileByUser ?? birthProfileBySession;
 
-  // Fetch chart from Convex
-  const chartDoc = useQuery(
+  const chartDocBySession = useQuery(
     api.functions.charts.getBySession,
     sessionId ? { sessionId } : "skip"
   );
+  const chartDocByUser = useQuery(
+    api.functions.charts.getByUser,
+    userId ? { userId } : "skip"
+  );
+  const chartDoc = chartDocByUser ?? chartDocBySession;
 
   // Parse chart data from JSON string stored in Convex
   const chart: CanonicalChart | null = useMemo(() => {

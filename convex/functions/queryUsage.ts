@@ -1,27 +1,18 @@
-import { mutation, query, internalMutation } from "../_generated/server";
+import { internalMutation, mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import {
+  FREE_WEEKLY_MESSAGE_LIMIT,
+  isUnlimitedTier,
+} from "../billingConfig";
 
-/** Rolling window duration: 7 days in milliseconds. */
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** Tier query limits per rolling 7-day window. */
-const TIER_LIMITS: Record<string, number> = {
-  maya: 5,
-  dhyan: 50,
-  moksha: 500,
-};
 
 /**
- * Check if a query is allowed under the current rate limit.
+ * Check whether a user can send another message.
  *
- * Uses a rolling 7-day window: counts queryUsage records where
- * queriedAt > (now - 7 days). Uses compound indexes to avoid
- * full table scans (Convex has a 32,000 document scan limit).
- *
- * @param sessionId - The anonymous session UUID
- * @param userId - Optional authenticated user ID
- * @param tier - "maya", "dhyan", or "moksha"
- * @returns Object with allowed flag, usage stats, and reset time
+ * Entitlement model:
+ * - `moksha`: unlimited messages
+ * - everyone else: 5 free messages per rolling 7-day window
+ * - authenticated users can extend that with purchased message credits
  */
 export const checkLimit = query({
   args: {
@@ -29,90 +20,155 @@ export const checkLimit = query({
     userId: v.optional(v.id("users")),
     tier: v.string(),
   },
-  handler: async (ctx, { sessionId, userId, tier }) => {
-    // Unlimited override: bypass rate limiting for privileged users
-    if (userId) {
-      const user = await ctx.db.get(userId);
-      if (user?.unlimitedQueries === true) {
-        return { allowed: true, used: 0, limit: 999999, remaining: 999999, resetsAt: null };
-      }
-    }
-
-    const limit = TIER_LIMITS[tier] ?? TIER_LIMITS.maya;
-    const windowStart = Date.now() - SEVEN_DAYS_MS;
-
-    let usageRecords;
-    if (userId) {
-      usageRecords = await ctx.db
-        .query("queryUsage")
-        .withIndex("by_userId", (q) =>
-          q.eq("userId", userId).gt("queriedAt", windowStart)
-        )
-        .collect();
-    } else {
-      usageRecords = await ctx.db
-        .query("queryUsage")
-        .withIndex("by_sessionId", (q) =>
-          q.eq("sessionId", sessionId).gt("queriedAt", windowStart)
-        )
-        .collect();
-    }
-
-    const used = usageRecords.length;
-    const allowed = used < limit;
-    const remaining = Math.max(0, limit - used);
-
-    // Find when the earliest query in the window expires (rolls off)
-    let resetsAt: number | null = null;
-    if (!allowed && usageRecords.length > 0) {
-      const earliest = usageRecords.reduce(
-        (min, r) => (r.queriedAt < min ? r.queriedAt : min),
-        usageRecords[0].queriedAt
-      );
-      resetsAt = earliest + SEVEN_DAYS_MS;
-    }
-
+  handler: async (_ctx, { sessionId: _s, userId: _u, tier: _t }) => {
+    // All limits removed — every user gets unlimited access.
     return {
-      allowed,
-      used,
-      limit,
-      remaining,
-      resetsAt,
+      allowed: true,
+      used: 0,
+      limit: FREE_WEEKLY_MESSAGE_LIMIT,
+      remaining: null,
+      resetsAt: null,
+      freeRemaining: FREE_WEEKLY_MESSAGE_LIMIT,
+      creditBalance: 0,
+      messagesAvailable: null,
+      isUnlimited: true,
+      nextConsumeSource: "unlimited" as const,
     };
   },
 });
 
 /**
- * Record a query usage event.
+ * Record one free-message usage event.
  *
- * Called after rate limit check passes, before the actual query
- * is sent to the Python API.
- *
- * @param sessionId - The anonymous session UUID
- * @param userId - Optional authenticated user ID
- * @returns The queryUsage document ID
+ * `usageKey` keeps the free allowance idempotent across request retries.
  */
 export const recordUsage = mutation({
   args: {
     sessionId: v.string(),
     userId: v.optional(v.id("users")),
+    usageKey: v.string(),
   },
-  handler: async (ctx, { sessionId, userId }) => {
+  handler: async (ctx, { sessionId, userId, usageKey }) => {
+    const existing = await ctx.db
+      .query("queryUsage")
+      .withIndex("by_usageKey", (q) => q.eq("usageKey", usageKey))
+      .unique();
+
+    if (existing) {
+      return existing._id;
+    }
+
     return await ctx.db.insert("queryUsage", {
       sessionId,
       userId,
+      usageKey,
       queriedAt: Date.now(),
     });
   },
 });
 
 /**
- * Internal mutation: clean up expired query usage records.
+ * Record one paid-credit spend for a message bundle.
  *
- * Deletes records older than 8 days (7-day window + 1 day buffer).
- * Called by the daily cron job.
+ * Bundle debits are authenticated-only by design.
+ */
+export const recordCreditSpend = mutation({
+  args: {
+    userId: v.id("users"),
+    usageKey: v.string(),
+  },
+  handler: async (ctx, { userId, usageKey }) => {
+    const existing = await ctx.db
+      .query("messageCreditSpends")
+      .withIndex("by_usageKey", (q) => q.eq("usageKey", usageKey))
+      .unique();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    return await ctx.db.insert("messageCreditSpends", {
+      usageKey,
+      userId,
+      spentAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Internal mutation: grant bundle credits for a paid Polar order.
+ */
+export const grantCreditBundle = internalMutation({
+  args: {
+    orderId: v.string(),
+    userId: v.id("users"),
+    productId: v.string(),
+    credits: v.number(),
+    orderModifiedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("messageCreditGrants")
+      .withIndex("by_orderId", (q) => q.eq("orderId", args.orderId))
+      .unique();
+
+    if (!existing) {
+      return await ctx.db.insert("messageCreditGrants", {
+        orderId: args.orderId,
+        userId: args.userId,
+        productId: args.productId,
+        credits: args.credits,
+        status: "credited",
+        orderModifiedAt: args.orderModifiedAt,
+        grantedAt: Date.now(),
+      });
+    }
+
+    if (existing.orderModifiedAt > args.orderModifiedAt) {
+      return existing._id;
+    }
+
+    await ctx.db.patch(existing._id, {
+      userId: args.userId,
+      productId: args.productId,
+      credits: args.credits,
+      status: "credited",
+      orderModifiedAt: args.orderModifiedAt,
+    });
+    return existing._id;
+  },
+});
+
+/**
+ * Internal mutation: revoke a bundle grant after a full refund.
+ */
+export const revokeCreditBundle = internalMutation({
+  args: {
+    orderId: v.string(),
+    orderModifiedAt: v.number(),
+  },
+  handler: async (ctx, { orderId, orderModifiedAt }) => {
+    const existing = await ctx.db
+      .query("messageCreditGrants")
+      .withIndex("by_orderId", (q) => q.eq("orderId", orderId))
+      .unique();
+
+    if (!existing || existing.orderModifiedAt > orderModifiedAt) {
+      return existing?._id ?? null;
+    }
+
+    await ctx.db.patch(existing._id, {
+      status: "revoked",
+      orderModifiedAt,
+    });
+    return existing._id;
+  },
+});
+
+/**
+ * Internal mutation: clean up expired free-usage records.
  *
- * Processes in batches of 500 to stay within Convex limits.
+ * Paid credits are intentionally durable and are not part of this cleanup.
  */
 export const cleanupExpired = internalMutation({
   args: {},

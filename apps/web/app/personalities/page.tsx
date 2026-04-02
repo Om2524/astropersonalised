@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { ArrowLeft, Loader2, Users } from "lucide-react";
 import Link from "next/link";
@@ -67,7 +67,8 @@ function PersonalityCard({ person }: { person: PersonalityMatch }) {
 export default function PersonalitiesPage() {
   const router = useRouter();
   const { chart, chartRaw, sessionId } = useApp();
-  const subscription = useSubscription(sessionId);
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const subscription = useSubscription(sessionId, currentUser?._id);
   const personalityMatchAction = useAction(api.actions.personalityMatch.personalityMatch);
 
   const [matches, setMatches] = useState<PersonalityMatch[]>([]);
@@ -80,8 +81,9 @@ export default function PersonalitiesPage() {
     (async () => {
       try {
         const data = await personalityMatchAction({
+          sessionId,
+          userId: currentUser?._id ?? undefined,
           chartData: chartRaw,
-          tier: subscription.tier,
         });
         if (!cancelled) {
           const result = data as Record<string, unknown>;
@@ -98,7 +100,7 @@ export default function PersonalitiesPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [chart, chartRaw, router, personalityMatchAction, subscription.tier]);
+  }, [chart, chartRaw, currentUser?._id, personalityMatchAction, router, sessionId]);
 
   if (!chart) return null;
 

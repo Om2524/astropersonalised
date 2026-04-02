@@ -40,7 +40,11 @@ htmlcov/
 .pytest_cache/
 
 # Convex
-apps/web/convex/_generated/
+apps/web/convex/_generated/*
+!apps/web/convex/_generated/
+!apps/web/convex/_generated/api.js
+!apps/web/convex/_generated/api.d.ts
+!apps/web/convex/_generated/dataModel.d.ts
 
 # Cloudflare
 apps/web/.open-next/

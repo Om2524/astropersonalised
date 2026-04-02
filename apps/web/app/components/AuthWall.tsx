@@ -2,27 +2,23 @@
 
 import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { X, Loader2, Mail } from "lucide-react";
-import type { Id } from "@convex/_generated/dataModel";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 
 interface AuthWallProps {
   isOpen: boolean;
   onClose: () => void;
-  sessionId: string;
   reason?: string;
+  redirectTo?: string;
 }
 
 export default function AuthWall({
   isOpen,
   onClose,
-  sessionId,
   reason = "Sign in to continue",
+  redirectTo,
 }: AuthWallProps) {
   const { signIn } = useAuthActions();
-  const migrateSession = useMutation(api.functions.users.migrateSession);
 
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
@@ -32,26 +28,24 @@ export default function AuthWall({
 
   if (!isOpen) return null;
 
+  function getRedirectTarget() {
+    if (redirectTo) {
+      return redirectTo;
+    }
+
+    if (typeof window === "undefined") {
+      return "/chat";
+    }
+
+    const target = `${window.location.pathname}${window.location.search}`;
+    return target === "/auth/signin" ? "/chat" : target;
+  }
+
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     setError(null);
     try {
-      const result = await signIn("google", { redirectTo: "/chat" });
-      // After auth, migrate anonymous session data — if migration fails,
-      // still let auth succeed (data can be re-migrated later).
-      if (result && typeof result === "object" && "userId" in result) {
-        try {
-          await migrateSession({
-            sessionId,
-            userId: result.userId as Id<"users">,
-          });
-        } catch (migrationErr) {
-          console.error(
-            "Session migration failed (auth will continue):",
-            migrationErr instanceof Error ? migrationErr.message : migrationErr
-          );
-        }
-      }
+      await signIn("google", { redirectTo: getRedirectTarget() });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to sign in with Google"
@@ -66,7 +60,10 @@ export default function AuthWall({
     setLoading(true);
     setError(null);
     try {
-      await signIn("resend", { email: email.trim() });
+      await signIn("resend", {
+        email: email.trim(),
+        redirectTo: getRedirectTarget(),
+      });
       setEmailSent(true);
     } catch (err) {
       setError(

@@ -9,7 +9,6 @@ const TIER_FEATURES: Record<
   { canCompare: boolean; canWeekly: boolean }
 > = {
   maya: { canCompare: false, canWeekly: false },
-  dhyan: { canCompare: true, canWeekly: true },
   moksha: { canCompare: true, canWeekly: true },
 };
 
@@ -50,6 +49,10 @@ export function useSubscription(
     remaining: usageInfo?.remaining ?? 5,
     allowed: usageInfo?.allowed ?? true,
     resetsAt: usageInfo?.resetsAt ?? null,
+    isUnlimited: usageInfo?.isUnlimited ?? false,
+    freeRemaining: usageInfo?.freeRemaining ?? 5,
+    creditBalance: usageInfo?.creditBalance ?? 0,
+    messagesAvailable: usageInfo?.messagesAvailable ?? 5,
     canCompare: features.canCompare,
     canWeekly: features.canWeekly,
     loading: tierInfo === undefined || usageInfo === undefined,
