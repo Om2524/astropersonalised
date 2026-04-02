@@ -30,6 +30,14 @@ export const checkLimit = query({
     tier: v.string(),
   },
   handler: async (ctx, { sessionId, userId, tier }) => {
+    // Unlimited override: bypass rate limiting for privileged users
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user?.unlimitedQueries === true) {
+        return { allowed: true, used: 0, limit: 999999, remaining: 999999, resetsAt: null };
+      }
+    }
+
     const limit = TIER_LIMITS[tier] ?? TIER_LIMITS.maya;
     const windowStart = Date.now() - SEVEN_DAYS_MS;
 

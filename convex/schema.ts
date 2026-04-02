@@ -30,6 +30,7 @@ const schema = defineSchema({
     authProvider: v.optional(v.string()),
     language: v.optional(v.string()),
     createdAt: v.optional(v.number()),
+    unlimitedQueries: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),
