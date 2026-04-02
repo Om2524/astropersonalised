@@ -18,6 +18,7 @@ import DashaBadge from "./components/DashaBadge";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
 import AuthWall from "@/app/components/AuthWall";
+import posthog from "posthog-js";
 
 /**
  * Split streaming content into main body and "Explore Further" questions.
@@ -195,6 +196,10 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      posthog.capture('message_sent', {
+        method,
+        tone: profile?.tone,
+      });
       setIsLoading(true);
       setLedgerSteps([]);
       setLedgerComplete(false);
@@ -385,6 +390,10 @@ export default function ChatPage() {
                   }).catch((error: unknown) =>
                     console.error("Failed to store reading:", error)
                   );
+
+                  posthog.capture('reading_received', {
+                    method: methodUsed || method,
+                  });
 
                   break;
                 }
