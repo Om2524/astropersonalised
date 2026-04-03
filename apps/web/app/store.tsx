@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { CanonicalChart, UserProfile } from "@/app/types";
+import posthog from "posthog-js";
 
 const SESSION_KEY = "shastra_session_id";
 
@@ -121,6 +122,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lastMigratedKeyRef.current = null;
     });
   }, [currentUser?._id, migrateSession, sessionId]);
+
+  // Identify authenticated user in PostHog
+  useEffect(() => {
+    if (currentUser?._id) {
+      posthog.identify(currentUser._id, {
+        email: currentUser.email,
+        name: currentUser.name,
+        authProvider: currentUser.authProvider,
+        language: currentUser.language,
+        createdAt: currentUser.createdAt,
+      });
+    }
+  }, [currentUser]);
 
   // Don't render until client-side hydration is complete
   if (!hydrated) return null;

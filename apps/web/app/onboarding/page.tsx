@@ -19,6 +19,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { UserProfile } from "@/app/types";
+import posthog from "posthog-js";
 
 const TONE_OPTIONS: {
   value: UserProfile["tone"];
@@ -80,6 +81,12 @@ export default function OnboardingPage() {
         timezone: "UTC",
         birthTimeQuality,
         tone,
+      });
+
+      posthog.capture('onboarding_completed', {
+        birthTimeQuality,
+        tone,
+        timeOfBirthProvided: !unknownTime && !!tob,
       });
 
       router.push("/chat");

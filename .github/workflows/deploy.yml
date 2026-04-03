@@ -130,6 +130,8 @@ jobs:
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_SHASTRA_STREAM_URL: https://api.forsee.life
+          NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
 
       - name: Patch node:https → node:http in build output
         run: |

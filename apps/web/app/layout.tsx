@@ -3,6 +3,7 @@ import { Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/app/ConvexClientProvider";
 import { AppProvider } from "@/app/store";
+import { PostHogProvider } from "@/app/providers/posthog";
 
 const sourceSerif = Source_Serif_4({ subsets: ["latin"] });
 
@@ -19,9 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={sourceSerif.className}>
-        <ConvexClientProvider>
-          <AppProvider>{children}</AppProvider>
-        </ConvexClientProvider>
+        <PostHogProvider>
+          <ConvexClientProvider>
+            <AppProvider>{children}</AppProvider>
+          </ConvexClientProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@convex/_generated/api";
+import posthog from "posthog-js";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
@@ -49,6 +50,11 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
   const { signOut } = useAuthActions();
+
+  const handleSignOut = () => {
+    posthog.reset();
+    signOut();
+  };
 
   const isLoadingUser = currentUser === undefined;
   const isSignedIn = !!currentUser;
@@ -160,7 +166,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
                 </Link>
               )}
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-text-secondary hover:bg-white/20 hover:text-text-primary transition-colors"
               >
                 <LogOut className="h-3 w-3" />
