@@ -39,8 +39,8 @@ jobs:
 
       - name: Deploy functions + schema
         run: |
-          ln -s apps/web/node_modules node_modules
-          ln -s apps/web/package.json package.json
+          ln -sf apps/web/node_modules node_modules
+          ln -sf apps/web/package.json package.json
           npx convex deploy --typecheck disable
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
@@ -115,8 +115,8 @@ jobs:
 
       - name: Generate Convex types
         run: |
-          ln -s apps/web/node_modules node_modules
-          ln -s apps/web/package.json package.json
+          ln -sf apps/web/node_modules node_modules
+          ln -sf apps/web/package.json package.json
           npx convex codegen --typecheck=disable
         working-directory: .
         env:
