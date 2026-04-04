@@ -81,98 +81,115 @@ export const authorizeStream: PublicAction = action({
     ctx: ActionCtx,
     args: AuthorizeStreamArgs
   ): Promise<AuthorizeStreamResult> => {
-    // 1. Resolve tier
-    const tierInfo = await ctx.runQuery(
-      api.functions.subscriptions.getCurrentTier,
-      {
+    try {
+      // 1. Resolve tier
+      const tierInfo = await ctx.runQuery(
+        api.functions.subscriptions.getCurrentTier,
+        {
+          sessionId: args.sessionId,
+          userId: args.userId,
+        }
+      );
+
+      // 2. Check message entitlement
+      const usage = await ctx.runQuery(api.functions.queryUsage.checkLimit, {
         sessionId: args.sessionId,
         userId: args.userId,
+        tier: tierInfo.tier,
+      });
+
+      // Record usage for analytics (no limits enforced) — fire and forget so
+      // a transient mutation failure never blocks the stream from starting.
+      ctx.runMutation(api.functions.queryUsage.recordUsage, {
+        sessionId: args.sessionId,
+        userId: args.userId,
+        usageKey: args.usageKey,
+      }).catch((err: unknown) => {
+        console.error("recordUsage failed (non-blocking):", err);
+      });
+
+      // 5. Generate HMAC-SHA256 token
+      const secret = process.env.STREAM_TOKEN_SECRET;
+      const computeUrl = process.env.SHASTRA_COMPUTE_URL;
+
+      if (!secret) {
+        throw new Error("Missing STREAM_TOKEN_SECRET environment variable");
       }
-    );
+      if (!computeUrl) {
+        throw new Error("Missing SHASTRA_COMPUTE_URL environment variable");
+      }
 
-    // 2. Check message entitlement
-    const usage = await ctx.runQuery(api.functions.queryUsage.checkLimit, {
-      sessionId: args.sessionId,
-      userId: args.userId,
-      tier: tierInfo.tier,
-    });
+      const now = Date.now();
+      const expiresAt = now + 60 * 1000; // 60 seconds
 
-    // Record usage for analytics (no limits enforced)
-    await ctx.runMutation(api.functions.queryUsage.recordUsage, {
-      sessionId: args.sessionId,
-      userId: args.userId,
-      usageKey: args.usageKey,
-    });
+      const payload = {
+        sessionId: args.sessionId,
+        userId: args.userId ?? null,
+        queriedAt: now,
+        exp: expiresAt,
+      };
 
-    // 5. Generate HMAC-SHA256 token
-    const secret = process.env.STREAM_TOKEN_SECRET;
-    const computeUrl = process.env.SHASTRA_COMPUTE_URL;
+      const payloadString = JSON.stringify(payload);
 
-    if (!secret) {
-      throw new Error("Missing STREAM_TOKEN_SECRET environment variable");
+      // Use Web Crypto API for HMAC-SHA256 signing
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(secret);
+      const key = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+
+      const signature = await crypto.subtle.sign(
+        "HMAC",
+        key,
+        encoder.encode(payloadString)
+      );
+
+      // Encode as base64url: payload.signature
+      const payloadB64 = btoa(payloadString)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      const signatureB64 = btoa(
+        String.fromCharCode(...new Uint8Array(signature))
+      )
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+
+      const token = `${payloadB64}.${signatureB64}`;
+
+      // 6. Return token and usage
+      return {
+        success: true,
+        token,
+        expiresAt,
+        streamUrl: `${computeUrl}/v1/reading/stream`,
+        usage: {
+          used: usage.used,
+          limit: usage.limit,
+          remaining: null,
+          resetsAt: null,
+        },
+        tier: tierInfo.tier,
+        error: null,
+        message: null,
+      };
+    } catch (err) {
+      console.error("authorizeStream error:", err);
+      return {
+        success: false,
+        error: "server_error",
+        message: "Something went wrong. Please try again.",
+        usage: { used: 0, limit: 5, remaining: null, resetsAt: null },
+        tier: "maya",
+        token: null,
+        expiresAt: null,
+        streamUrl: null,
+      };
     }
-    if (!computeUrl) {
-      throw new Error("Missing SHASTRA_COMPUTE_URL environment variable");
-    }
-
-    const now = Date.now();
-    const expiresAt = now + 60 * 1000; // 60 seconds
-
-    const payload = {
-      sessionId: args.sessionId,
-      userId: args.userId ?? null,
-      queriedAt: now,
-      exp: expiresAt,
-    };
-
-    const payloadString = JSON.stringify(payload);
-
-    // Use Web Crypto API for HMAC-SHA256 signing
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secret);
-    const key = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-
-    const signature = await crypto.subtle.sign(
-      "HMAC",
-      key,
-      encoder.encode(payloadString)
-    );
-
-    // Encode as base64url: payload.signature
-    const payloadB64 = btoa(payloadString)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-    const signatureB64 = btoa(
-      String.fromCharCode(...new Uint8Array(signature))
-    )
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const token = `${payloadB64}.${signatureB64}`;
-
-    // 6. Return token and usage
-    return {
-      success: true,
-      token,
-      expiresAt,
-      streamUrl: `${computeUrl}/v1/reading/stream`,
-      usage: {
-        used: usage.used,
-        limit: usage.limit,
-        remaining: null,
-        resetsAt: null,
-      },
-      tier: tierInfo.tier,
-      error: null,
-      message: null,
-    };
   },
 });
