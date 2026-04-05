@@ -98,15 +98,18 @@ export const authorizeStream: PublicAction = action({
         tier: tierInfo.tier,
       });
 
-      // Record usage for analytics (no limits enforced) — fire and forget so
-      // a transient mutation failure never blocks the stream from starting.
-      ctx.runMutation(api.functions.queryUsage.recordUsage, {
-        sessionId: args.sessionId,
-        userId: args.userId,
-        usageKey: args.usageKey,
-      }).catch((err: unknown) => {
-        console.error("recordUsage failed (non-blocking):", err);
-      });
+      // Record usage for analytics — awaited (Convex throws on dangling promises)
+      // but errors are swallowed so a transient mutation failure never blocks
+      // the stream token from being issued.
+      try {
+        await ctx.runMutation(api.functions.queryUsage.recordUsage, {
+          sessionId: args.sessionId,
+          userId: args.userId,
+          usageKey: args.usageKey,
+        });
+      } catch (usageErr) {
+        console.error("recordUsage failed (non-blocking):", usageErr);
+      }
 
       // 5. Generate HMAC-SHA256 token
       const secret = process.env.STREAM_TOKEN_SECRET;
