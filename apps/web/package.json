@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build --webpack",
+    "build": "next build --webpack && mkdir -p .next/standalone/.next/server && echo '{}' > .next/standalone/.next/server/pages-manifest.json",
     "start": "next start",
     "deploy": "opennextjs-cloudflare && wrangler pages deploy"
   },

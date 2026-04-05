@@ -41,27 +41,6 @@ const nextConfig: NextConfig = {
         },
         ...(Array.isArray(prevExternals) ? prevExternals : [prevExternals]),
       ];
-
-      // @opennextjs/cloudflare@1.17.1 reads pages-manifest.json from the
-      // standalone output unconditionally (build.js:69). App Router projects
-      // don't generate this file. Emit an empty shim so it exists in
-      // .next/server/ and is copied into .next/standalone/.next/server/
-      // before OpenNext's bundler runs.
-      config.plugins.push({
-        apply(compiler: import("webpack").Compiler) {
-          compiler.hooks.afterEmit.tap("PagesManifestShim", () => {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const fs = require("fs") as typeof import("fs");
-            const manifestPath = path.join(
-              compiler.outputPath,
-              "pages-manifest.json"
-            );
-            if (!fs.existsSync(manifestPath)) {
-              fs.writeFileSync(manifestPath, "{}");
-            }
-          });
-        },
-      });
     }
     return config;
   },
