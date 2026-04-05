@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   transpilePackages: ["convex", "@convex-dev/auth", "@convex-dev/polar"],
   typescript: {
     ignoreBuildErrors: true,
