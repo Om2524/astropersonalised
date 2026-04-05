@@ -27,18 +27,18 @@ class ReadingResponse(BaseModel):
     raw_text: str  # full text for display
 
 
-    # Language instructions for the LLM
-    LANGUAGE_INSTRUCTIONS = {
-        "en": "",  # English is the default, no extra instruction needed
-        "hi": "LANGUAGE: Respond entirely in Hindi (हिन्दी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Hindi.",
-        "mr": "LANGUAGE: Respond entirely in Marathi (मराठी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Marathi.",
-        "te": "LANGUAGE: Respond entirely in Telugu (తెలుగు) using Telugu script. All section headings, explanations, and follow-up questions must be in Telugu.",
-        "ta": "LANGUAGE: Respond entirely in Tamil (தமிழ்) using Tamil script. All section headings, explanations, and follow-up questions must be in Tamil.",
-        "kn": "LANGUAGE: Respond entirely in Kannada (ಕನ್ನಡ) using Kannada script. All section headings, explanations, and follow-up questions must be in Kannada.",
-        "bn": "LANGUAGE: Respond entirely in Bengali (বাংলা) using Bengali script. All section headings, explanations, and follow-up questions must be in Bengali.",
-        "gu": "LANGUAGE: Respond entirely in Gujarati (ગુજરાતી) using Gujarati script. All section headings, explanations, and follow-up questions must be in Gujarati.",
-        "es": "LANGUAGE: Respond entirely in Spanish (Español). All section headings, explanations, and follow-up questions must be in Spanish.",
-    }
+_LANGUAGE_INSTRUCTIONS = {
+    "en": "",
+    "hi": "LANGUAGE: Respond entirely in Hindi (हिन्दी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Hindi.",
+    "mr": "LANGUAGE: Respond entirely in Marathi (मराठी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Marathi.",
+    "te": "LANGUAGE: Respond entirely in Telugu (తెలుగు) using Telugu script. All section headings, explanations, and follow-up questions must be in Telugu.",
+    "ta": "LANGUAGE: Respond entirely in Tamil (தமிழ்) using Tamil script. All section headings, explanations, and follow-up questions must be in Tamil.",
+    "kn": "LANGUAGE: Respond entirely in Kannada (ಕನ್ನಡ) using Kannada script. All section headings, explanations, and follow-up questions must be in Kannada.",
+    "bn": "LANGUAGE: Respond entirely in Bengali (বাংলা) using Bengali script. All section headings, explanations, and follow-up questions must be in Bengali.",
+    "gu": "LANGUAGE: Respond entirely in Gujarati (ગુજરાતી) using Gujarati script. All section headings, explanations, and follow-up questions must be in Gujarati.",
+    "es": "LANGUAGE: Respond entirely in Spanish (Español). All section headings, explanations, and follow-up questions must be in Spanish.",
+}
+
 
 class AnswerComposer:
     """Composes personalized astrology readings from chart evidence via LLM."""
@@ -48,7 +48,7 @@ class AnswerComposer:
         pass
 
     def _get_language_instruction(self, language: str) -> str:
-        return self.LANGUAGE_INSTRUCTIONS.get(language, "")
+        return _LANGUAGE_INSTRUCTIONS.get(language, "")
 
     def compose(
         self,
