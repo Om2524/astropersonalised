@@ -28,6 +28,8 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   onNewReading: () => void;
+  onLoadReading: (readingId: string) => void;
+  activeReadingId: string | null;
 }
 
 const NAV_ITEMS = [
@@ -45,11 +47,32 @@ const TIER_COLORS: Record<string, string> = {
   moksha: "bg-yellow-500/15 text-yellow-600",
 };
 
-export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps) {
+function relativeGroup(ts: number): string {
+  const now = new Date();
+  const d = new Date(ts);
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffDays === 0 && now.getDate() === d.getDate()) return "Today";
+  if (diffDays <= 1 && now.getDate() - d.getDate() === 1) return "Yesterday";
+  if (diffDays < 7) return "This week";
+  return "Older";
+}
+
+export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading, activeReadingId }: SidebarProps) {
   const { sessionId } = useApp();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
   const { signOut } = useAuthActions();
+
+  const readingsByUser = useQuery(
+    api.functions.readings.listByUser,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
+  );
+  const readingsBySession = useQuery(
+    api.functions.readings.listBySession,
+    !currentUser && sessionId ? { sessionId } : "skip"
+  );
+  const readings = readingsByUser ?? readingsBySession ?? [];
 
   const handleSignOut = () => {
     posthog.reset();
@@ -114,8 +137,49 @@ export default function Sidebar({ isOpen, onToggle, onNewReading }: SidebarProps
           </button>
         </div>
 
+        {/* Reading history */}
+        {readings.length > 0 && (
+          <div className="flex-1 min-h-0 flex flex-col px-3 pb-2">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
+              Recent
+            </p>
+            <div className="flex-1 overflow-y-auto space-y-px scrollbar-thin">
+              {(() => {
+                let lastGroup = "";
+                return readings.map((r: { _id: string; query: string; createdAt: number }) => {
+                  const group = relativeGroup(r.createdAt);
+                  const showGroup = group !== lastGroup;
+                  lastGroup = group;
+                  return (
+                    <div key={r._id}>
+                      {showGroup && group !== "Today" && (
+                        <p className="px-3 pt-3 pb-1 text-[10px] font-medium text-text-secondary/40">
+                          {group}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => {
+                          onLoadReading(r._id);
+                          if (window.innerWidth < 1024) onToggle();
+                        }}
+                        className={`flex w-full rounded-lg px-3 py-2 text-left text-[13px] leading-snug transition-colors truncate ${
+                          activeReadingId === r._id
+                            ? "bg-accent/10 text-accent font-medium"
+                            : "text-text-secondary hover:bg-white/15 hover:text-text-primary"
+                        }`}
+                      >
+                        {r.query.length > 42 ? r.query.slice(0, 42) + "..." : r.query}
+                      </button>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Nav */}
-        <nav className="flex-1 space-y-0.5 px-3">
+        <nav className="space-y-0.5 px-3 shrink-0">
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.label}

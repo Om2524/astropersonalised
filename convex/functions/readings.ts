@@ -44,6 +44,16 @@ export const store = mutation({
 });
 
 /**
+ * Get a single reading by ID.
+ */
+export const getById = query({
+  args: { readingId: v.id("readings") },
+  handler: async (ctx, { readingId }) => {
+    return await ctx.db.get(readingId);
+  },
+});
+
+/**
  * List readings for a session, most recent first.
  *
  * Uses the compound index [sessionId, createdAt] for efficient

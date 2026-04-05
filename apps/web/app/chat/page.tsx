@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery, useConvex } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import type { ChatMessage, ReadingResponse, PlanetContext } from "@/app/types";
@@ -117,8 +118,10 @@ export default function ChatPage() {
   const { sessionId, profile, chart, chartRaw, tone } = useApp();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
+  const convex = useConvex();
   const authorizeStreamAction = useAction(api.actions.authorizeStream.authorizeStream);
   const storeReading = useMutation(api.functions.readings.store);
+  const fetchQuery = convex.query.bind(convex);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [method, setMethod] = useState<string>("vedic");
@@ -131,6 +134,7 @@ export default function ChatPage() {
     { step: number; message: string }[]
   >([]);
   const [ledgerComplete, setLedgerComplete] = useState(false);
+  const [activeReadingId, setActiveReadingId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
@@ -510,7 +514,59 @@ export default function ChatPage() {
     setIsLoading(false);
     setLedgerSteps([]);
     setLedgerComplete(false);
+    setActiveReadingId(null);
   }, [streamBuffer]);
+
+  const handleLoadReading = useCallback(
+    async (readingId: string) => {
+      try {
+        const reading = await fetchQuery(api.functions.readings.getById, {
+          readingId: readingId as Id<"readings">,
+        });
+        if (!reading) return;
+
+        let parsedReading: ReadingResponse | undefined;
+        let directAnswer = "";
+        try {
+          const raw = JSON.parse(reading.reading);
+          directAnswer = raw.direct_answer ?? "";
+          parsedReading = raw as ReadingResponse;
+        } catch {
+          directAnswer = reading.reading;
+        }
+
+        let parsedClassification: ChatMessage["classification"];
+        try {
+          parsedClassification = JSON.parse(reading.classification);
+        } catch { /* skip */ }
+
+        const userMsg: ChatMessage = {
+          id: generateId(),
+          role: "user",
+          content: reading.query,
+          timestamp: reading.createdAt,
+        };
+        const assistantMsg: ChatMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: directAnswer,
+          reading: parsedReading,
+          classification: parsedClassification,
+          method_used: reading.method,
+          timestamp: reading.createdAt,
+        };
+
+        setMessages([userMsg, assistantMsg]);
+        setActiveReadingId(readingId);
+        setLedgerSteps([]);
+        setLedgerComplete(true);
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Failed to load reading:", err);
+      }
+    },
+    [fetchQuery]
+  );
 
   const handleFollowUp = useCallback(
     (question: string) => {
@@ -527,6 +583,8 @@ export default function ChatPage() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
         onNewReading={handleNewReading}
+        onLoadReading={handleLoadReading}
+        activeReadingId={activeReadingId}
       />
 
       <main className="flex flex-1 flex-col overflow-hidden relative">
