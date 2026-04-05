@@ -137,9 +137,26 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
           </button>
         </div>
 
-        {/* Reading history */}
+        {/* Nav */}
+        <nav className="space-y-0.5 px-3 shrink-0">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => {
+                if (window.innerWidth < 1024) onToggle();
+              }}
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-all hover:bg-white/20 hover:text-text-primary"
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Reading history — below nav, scrollable */}
         {readings.length > 0 && (
-          <div className="flex-1 min-h-0 flex flex-col px-3 pb-2">
+          <div className="flex-1 min-h-0 flex flex-col px-3 pt-4 pb-2 border-t border-white/10 mt-2">
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
               Recent
             </p>
@@ -177,23 +194,6 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
             </div>
           </div>
         )}
-
-        {/* Nav */}
-        <nav className="space-y-0.5 px-3 shrink-0">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => {
-                if (window.innerWidth < 1024) onToggle();
-              }}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-all hover:bg-white/20 hover:text-text-primary"
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
 
         {/* User section */}
         <div className="px-3 pb-3">
