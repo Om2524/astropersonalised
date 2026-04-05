@@ -19,6 +19,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { UserProfile } from "@/app/types";
+import { LANGUAGES } from "@/app/i18n/translations";
 import posthog from "posthog-js";
 
 const TONE_OPTIONS: {
@@ -50,6 +51,7 @@ export default function OnboardingPage() {
   const [timeQuality, setTimeQuality] = useState<"approximate" | "unknown">("approximate");
   const [birthplace, setBirthplace] = useState("");
   const [tone, setTone] = useState<UserProfile["tone"]>("practical");
+  const [language, setLanguage] = useState("en");
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +83,7 @@ export default function OnboardingPage() {
         timezone: "UTC",
         birthTimeQuality,
         tone,
+        language,
       });
 
       posthog.capture('onboarding_completed', {
@@ -189,8 +192,23 @@ export default function OnboardingPage() {
 
         {step === 1 && (
           <div className="animate-fade-in glass-section p-6">
-            <h1 className="text-2xl font-semibold text-text-primary mb-1">Reading Tone</h1>
-            <p className="text-text-secondary text-sm mb-8">Choose the style that feels right to you. You can change this anytime.</p>
+            {/* Language selector */}
+            <h2 className="text-lg font-semibold text-text-primary mb-1">Language</h2>
+            <p className="text-text-secondary text-sm mb-4">Choose your preferred language for readings and the interface.</p>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="glass-input-field mb-8 cursor-pointer"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.nativeLabel} — {lang.label}
+                </option>
+              ))}
+            </select>
+
+            <h2 className="text-lg font-semibold text-text-primary mb-1">Reading Tone</h2>
+            <p className="text-text-secondary text-sm mb-4">Choose the style that feels right to you. You can change this anytime.</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {TONE_OPTIONS.map((opt) => {

@@ -27,12 +27,28 @@ class ReadingResponse(BaseModel):
     raw_text: str  # full text for display
 
 
+    # Language instructions for the LLM
+    LANGUAGE_INSTRUCTIONS = {
+        "en": "",  # English is the default, no extra instruction needed
+        "hi": "LANGUAGE: Respond entirely in Hindi (हिन्दी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Hindi.",
+        "mr": "LANGUAGE: Respond entirely in Marathi (मराठी) using Devanagari script. All section headings, explanations, and follow-up questions must be in Marathi.",
+        "te": "LANGUAGE: Respond entirely in Telugu (తెలుగు) using Telugu script. All section headings, explanations, and follow-up questions must be in Telugu.",
+        "ta": "LANGUAGE: Respond entirely in Tamil (தமிழ்) using Tamil script. All section headings, explanations, and follow-up questions must be in Tamil.",
+        "kn": "LANGUAGE: Respond entirely in Kannada (ಕನ್ನಡ) using Kannada script. All section headings, explanations, and follow-up questions must be in Kannada.",
+        "bn": "LANGUAGE: Respond entirely in Bengali (বাংলা) using Bengali script. All section headings, explanations, and follow-up questions must be in Bengali.",
+        "gu": "LANGUAGE: Respond entirely in Gujarati (ગુજરાતી) using Gujarati script. All section headings, explanations, and follow-up questions must be in Gujarati.",
+        "es": "LANGUAGE: Respond entirely in Spanish (Español). All section headings, explanations, and follow-up questions must be in Spanish.",
+    }
+
 class AnswerComposer:
     """Composes personalized astrology readings from chart evidence via LLM."""
 
     def __init__(self):
         """Initialize the answer composer (no API key needed; llm_client reads settings)."""
         pass
+
+    def _get_language_instruction(self, language: str) -> str:
+        return self.LANGUAGE_INSTRUCTIONS.get(language, "")
 
     def compose(
         self,
@@ -41,9 +57,10 @@ class AnswerComposer:
         method: str,
         tone: str = "practical",
         birth_time_quality: str = "exact",
+        language: str = "en",
     ) -> ReadingResponse:
         """Compose a structured reading from evidence (non-streaming)."""
-        prompt = self._build_prompt(query, evidence, method, tone, birth_time_quality)
+        prompt = self._build_prompt(query, evidence, method, tone, birth_time_quality, language)
 
         text = llm_client.generate(prompt, json_mode=True)
         data = json.loads(text)
@@ -57,15 +74,16 @@ class AnswerComposer:
         method: str,
         tone: str = "practical",
         birth_time_quality: str = "exact",
+        language: str = "en",
     ) -> Generator[str, None, None]:
         """Stream the reading text chunk by chunk."""
         prompt = self._build_prompt_freeform(
-            query, evidence, method, tone, birth_time_quality
+            query, evidence, method, tone, birth_time_quality, language
         )
 
         yield from llm_client.generate_stream(prompt)
 
-    def _build_prompt(self, query, evidence, method, tone, birth_time_quality):
+    def _build_prompt(self, query, evidence, method, tone, birth_time_quality, language="en"):
         """Build the structured JSON prompt for non-streaming readings."""
         tone_instructions = {
             "practical": "Be direct, actionable, and grounded. Focus on what the person can do.",
@@ -75,6 +93,7 @@ class AnswerComposer:
         }
 
         tone_guide = tone_instructions.get(tone, tone_instructions["practical"])
+        lang_guide = self._get_language_instruction(language)
 
         confidence_context = ""
         if birth_time_quality == "unknown":
@@ -85,6 +104,7 @@ class AnswerComposer:
         return f'''You are Shastra, a wise and knowledgeable astrologer. You provide personalized readings grounded in actual chart data. Never fabricate planetary positions or aspects not present in the evidence.
 
 TONE: {tone_guide}
+{lang_guide}
 {confidence_context}
 
 The user asked: "{query}"
@@ -111,7 +131,7 @@ IMPORTANT:
 
 Return ONLY valid JSON.'''
 
-    def _build_prompt_freeform(self, query, evidence, method, tone, birth_time_quality):
+    def _build_prompt_freeform(self, query, evidence, method, tone, birth_time_quality, language="en"):
         """Build prompt for streaming (returns formatted text, not JSON)."""
         tone_instructions = {
             "practical": "Be direct, actionable, and grounded.",
@@ -120,10 +140,12 @@ Return ONLY valid JSON.'''
             "concise": "Be extremely brief.",
         }
         tone_guide = tone_instructions.get(tone, tone_instructions["practical"])
+        lang_guide = self._get_language_instruction(language)
 
         return f'''You are Shastra, a wise astrologer providing personalized readings.
 
 TONE: {tone_guide}
+{lang_guide}
 
 The user asked: "{query}"
 Method: {method}

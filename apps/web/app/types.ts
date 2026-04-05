@@ -123,6 +123,7 @@ export interface UserProfile {
   birthplace: string;
   birth_time_quality: "exact" | "approximate" | "unknown";
   tone: "practical" | "emotional" | "spiritual" | "concise";
+  language?: string;
 }
 
 export interface PlanetPlacement {

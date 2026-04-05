@@ -61,6 +61,7 @@ const schema = defineSchema({
     timezone: v.string(),
     birthTimeQuality: v.string(),
     tone: v.string(),
+    language: v.optional(v.string()),
   })
     .index("by_sessionId", ["sessionId"])
     .index("by_userId", ["userId"]),

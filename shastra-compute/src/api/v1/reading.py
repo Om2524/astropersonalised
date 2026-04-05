@@ -113,6 +113,7 @@ async def ask(req: AskRequest, _auth: ApiKeyAuth) -> AskResponse:
         method=method,
         tone=req.tone,
         birth_time_quality=req.birth_time_quality,
+        language=req.language,
     )
 
     # Build summary -- CompareEvidence has a different structure
@@ -212,6 +213,7 @@ async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingRespon
                     method=method,
                     tone=req.tone,
                     birth_time_quality=req.birth_time_quality,
+                    language=req.language,
                 ):
                     yield _sse_event("content", {"text": chunk})
 

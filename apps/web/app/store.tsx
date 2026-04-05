@@ -22,6 +22,7 @@ interface AppState {
   chart: CanonicalChart | null;
   chartRaw: string | null;
   tone: string;
+  language: string;
   ready: boolean;
 }
 
@@ -98,10 +99,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         | "emotional"
         | "spiritual"
         | "concise",
+      language: (birthProfile as { language?: string }).language,
     };
   }, [birthProfile]);
 
   const tone = profile?.tone ?? "practical";
+  const language = profile?.language ?? "en";
 
   useEffect(() => {
     if (!sessionId || !currentUser?._id) {
@@ -154,6 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         chart,
         chartRaw: chartDoc?.chartData ?? null,
         tone,
+        language,
         ready,
       }}
     >

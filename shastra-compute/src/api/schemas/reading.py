@@ -14,6 +14,7 @@ class AskRequest(BaseModel):
     query: str
     method: str = Field(default="auto", description="vedic, kp, western, compare, or auto")
     tone: str = Field(default="practical", description="practical, emotional, spiritual, concise")
+    language: str = Field(default="en", description="Response language code: en, hi, mr, te, ta, kn, bn, gu, es")
     # Birth data -- either provide chart_data or birth details
     chart_data: Optional[dict] = None
     # Or provide birth details for on-the-fly computation
@@ -39,6 +40,7 @@ class StreamRequest(BaseModel):
     query: str
     method: str = Field(default="auto", description="vedic, kp, western, compare, or auto")
     tone: str = Field(default="practical", description="practical, emotional, spiritual, concise")
+    language: str = Field(default="en", description="Response language code: en, hi, mr, te, ta, kn, bn, gu, es")
     chart_data: Optional[dict] = None
     date_of_birth: Optional[date] = None
     time_of_birth: Optional[time] = None

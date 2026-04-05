@@ -23,6 +23,7 @@ import posthog from "posthog-js";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
+import { useTranslation } from "@/app/i18n/useTranslation";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -33,13 +34,13 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { icon: LayoutGrid, label: "My Chart", href: "/chart" },
-  { icon: Sun, label: "Daily Brief", href: "/daily" },
-  { icon: Calendar, label: "Weekly Outlook", href: "/weekly" },
-  { icon: Bookmark, label: "Saved Readings", href: "/saved" },
-  { icon: Users, label: "Personalities", href: "/personalities" },
-  { icon: CreditCard, label: "Pricing", href: "/pricing" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: LayoutGrid, tKey: "nav.myChart", href: "/chart" },
+  { icon: Sun, tKey: "nav.dailyBrief", href: "/daily" },
+  { icon: Calendar, tKey: "nav.weeklyOutlook", href: "/weekly" },
+  { icon: Bookmark, tKey: "nav.savedReadings", href: "/saved" },
+  { icon: Users, tKey: "nav.personalities", href: "/personalities" },
+  { icon: CreditCard, tKey: "nav.pricing", href: "/pricing" },
+  { icon: Settings, tKey: "nav.settings", href: "/settings" },
 ];
 
 const TIER_COLORS: Record<string, string> = {
@@ -60,6 +61,7 @@ function relativeGroup(ts: number): string {
 
 export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading, activeReadingId }: SidebarProps) {
   const { sessionId } = useApp();
+  const { t } = useTranslation();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
   const { signOut } = useAuthActions();
@@ -133,7 +135,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
             className="flex w-full items-center gap-2 rounded-xl border border-white/30 bg-white/20 px-3 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/30 hover:border-white/40"
           >
             <Plus className="h-4 w-4" />
-            New Reading
+            {t("sidebar.newReading")}
           </button>
         </div>
 
@@ -141,7 +143,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
         <nav className="space-y-0.5 px-3 shrink-0">
           {NAV_ITEMS.map((item) => (
             <Link
-              key={item.label}
+              key={item.tKey}
               href={item.href}
               onClick={() => {
                 if (window.innerWidth < 1024) onToggle();
@@ -149,7 +151,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
               className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-all hover:bg-white/20 hover:text-text-primary"
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              {t(item.tKey)}
             </Link>
           ))}
         </nav>
@@ -158,7 +160,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
         {readings.length > 0 && (
           <div className="flex-1 min-h-0 flex flex-col px-3 pt-4 pb-2 border-t border-white/10 mt-2">
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
-              Recent
+              {t("sidebar.recent")}
             </p>
             <div className="flex-1 overflow-y-auto space-y-px scrollbar-thin">
               {(() => {
@@ -216,8 +218,8 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
               </div>
               <p className="mb-2 text-[11px] text-text-secondary/70">
                 {subscription.isUnlimited
-                  ? "Unlimited messages active"
-                  : `${subscription.messagesAvailable ?? 0} messages available`}
+                  ? t("sidebar.unlimitedActive")
+                  : t("sidebar.messagesAvailable", { count: subscription.messagesAvailable ?? 0 })}
               </p>
               {currentUser && (
                 <Link
@@ -226,7 +228,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
                   className="flex items-center gap-1.5 text-[11px] text-accent hover:underline mb-2"
                 >
                   <Crown className="h-3 w-3" />
-                  Billing & purchases
+                  {t("sidebar.billingPurchases")}
                 </Link>
               )}
               <button
@@ -234,7 +236,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
                 className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-text-secondary hover:bg-white/20 hover:text-text-primary transition-colors"
               >
                 <LogOut className="h-3 w-3" />
-                Sign out
+                {t("sidebar.signOut")}
               </button>
             </div>
           ) : (
@@ -244,7 +246,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
               className="flex w-full items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-3 py-2.5 text-sm text-text-secondary transition-all hover:bg-white/25 hover:text-text-primary"
             >
               <LogIn className="h-4 w-4" />
-              Sign In
+              {t("sidebar.signIn")}
             </Link>
           )}
         </div>
@@ -252,7 +254,7 @@ export default function Sidebar({ isOpen, onToggle, onNewReading, onLoadReading,
         {/* Footer */}
         <div className="px-5 py-3">
           <p className="text-[10px] text-text-secondary/40">
-            Powered by iktara
+            {t("sidebar.poweredBy")}
           </p>
         </div>
       </aside>

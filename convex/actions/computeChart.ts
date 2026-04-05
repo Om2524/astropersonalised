@@ -17,6 +17,7 @@ type ComputeChartArgs = {
   timezone: string;
   birthTimeQuality: string;
   tone: string;
+  language?: string;
 };
 
 type ComputeChartResult = {
@@ -63,6 +64,7 @@ export const computeChart: PublicAction = action({
     timezone: v.string(),
     birthTimeQuality: v.string(),
     tone: v.string(),
+    language: v.optional(v.string()),
   },
   handler: async (
     ctx: ActionCtx,
@@ -140,6 +142,7 @@ export const computeChart: PublicAction = action({
         timezone: chartResponse.timezone,
         birthTimeQuality: args.birthTimeQuality,
         tone: args.tone,
+        language: args.language,
       }
     );
 

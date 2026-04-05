@@ -19,6 +19,7 @@ import DashaBadge from "./components/DashaBadge";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
 import AuthWall from "@/app/components/AuthWall";
+import { useTranslation } from "@/app/i18n/useTranslation";
 import posthog from "posthog-js";
 
 /**
@@ -115,7 +116,8 @@ function useStreamBuffer() {
 }
 
 export default function ChatPage() {
-  const { sessionId, profile, chart, chartRaw, tone } = useApp();
+  const { sessionId, profile, chart, chartRaw, tone, language } = useApp();
+  const { t } = useTranslation();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
   const convex = useConvex();
@@ -278,6 +280,7 @@ export default function ChatPage() {
             method,
             chart_data: chartRaw ? JSON.parse(chartRaw).chart : {},
             tone: tone || "practical",
+            language: language || "en",
           }),
           signal: mergedSignal,
         });
@@ -594,10 +597,10 @@ export default function ChatPage() {
             <GalaxyLogo size={120} />
 
             <h1 className="mt-1 text-[28px] font-semibold text-text-primary tracking-tight">
-              We all are Stardust!
+              {t("chat.welcome")}
             </h1>
             <p className="mt-2 mb-10 max-w-md text-center text-[15px] text-text-secondary/70 leading-relaxed">
-              Ask anything about your life — your birth chart holds the answers
+              {t("chat.subtitle")}
             </p>
 
             <div className="w-full max-w-xl">
@@ -625,7 +628,7 @@ export default function ChatPage() {
             </div>
 
             <div className="mt-6 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-              {EXAMPLE_QUESTIONS.map((q) => (
+              {[t("chat.example1"), t("chat.example2"), t("chat.example3"), t("chat.example4")].map((q) => (
                 <button
                   key={q}
                   onClick={() => handleSubmit(q)}

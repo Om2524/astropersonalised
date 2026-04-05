@@ -66,6 +66,7 @@ export const upsert = mutation({
     timezone: v.string(),
     birthTimeQuality: v.string(),
     tone: v.string(),
+    language: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -83,6 +84,7 @@ export const upsert = mutation({
         timezone: args.timezone,
         birthTimeQuality: args.birthTimeQuality,
         tone: args.tone,
+        language: args.language,
         userId: args.userId,
       });
       return existing._id;
@@ -99,6 +101,7 @@ export const upsert = mutation({
       timezone: args.timezone,
       birthTimeQuality: args.birthTimeQuality,
       tone: args.tone,
+      language: args.language,
     });
   },
 });
@@ -109,6 +112,40 @@ export const upsert = mutation({
  * @param sessionId - The anonymous session UUID
  * @param tone - "practical", "emotional", "spiritual", or "concise"
  */
+/**
+ * Update the preferred language for a birth profile.
+ */
+export const updateLanguage = mutation({
+  args: {
+    sessionId: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+    language: v.string(),
+  },
+  handler: async (ctx, { sessionId, userId, language }) => {
+    let profile = null;
+
+    if (userId) {
+      profile = await ctx.db
+        .query("birthProfiles")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .first();
+    }
+
+    if (!profile && sessionId) {
+      profile = await ctx.db
+        .query("birthProfiles")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+        .unique();
+    }
+
+    if (!profile) {
+      throw new Error("Birth profile not found");
+    }
+
+    await ctx.db.patch(profile._id, { language });
+  },
+});
+
 export const updateTone = mutation({
   args: {
     sessionId: v.optional(v.string()),
