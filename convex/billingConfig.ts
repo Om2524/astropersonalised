@@ -24,3 +24,8 @@ export function isUnlimitedTier(tier: string) {
 export function isUnlimitedSubscriptionKey(productKey?: string | null) {
   return productKey === "moksha" || productKey === "dhyan";
 }
+
+export const ADMIN_EMAILS: ReadonlySet<string> = new Set([
+  "ompatil2524@gmail.com",
+  "kushjain125@gmail.com",
+]);

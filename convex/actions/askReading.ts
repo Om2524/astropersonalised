@@ -92,12 +92,41 @@ export const askReading: PublicAction = action({
       tier: tierInfo.tier,
     });
 
-    // Record usage for analytics (no limits enforced)
-    await ctx.runMutation(api.functions.queryUsage.recordUsage, {
-      sessionId: args.sessionId,
-      userId: args.userId,
-      usageKey: args.usageKey,
-    });
+    // 3. If rate limited, return error
+    if (!usage.allowed) {
+      return {
+        success: false,
+        error: "rate_limit_exceeded",
+        message:
+          "You're out of messages. Buy a 50-message pack or go Moksha Unlimited.",
+        usage: {
+          used: usage.used,
+          limit: usage.limit,
+          remaining: usage.remaining,
+          resetsAt: usage.resetsAt,
+        },
+        tier: tierInfo.tier,
+      } as AskReadingResult;
+    }
+
+    // 4. Record usage based on consume source
+    if (usage.nextConsumeSource === "free") {
+      await ctx.runMutation(api.functions.queryUsage.recordUsage, {
+        sessionId: args.sessionId,
+        userId: args.userId,
+        usageKey: args.usageKey,
+      });
+    } else if (usage.nextConsumeSource === "credit") {
+      if (!args.userId) {
+        throw new Error(
+          "Authenticated user required to spend message credits"
+        );
+      }
+      await ctx.runMutation(api.functions.queryUsage.recordCreditSpend, {
+        userId: args.userId,
+        usageKey: args.usageKey,
+      });
+    }
 
     // 5. Call Python API
     const computeUrl = process.env.SHASTRA_COMPUTE_URL;
@@ -155,16 +184,22 @@ export const askReading: PublicAction = action({
       createdAt: Date.now(),
     });
 
-    // 7. Return result with usage
+    // 7. Return result with usage (reflect the just-consumed message)
     return {
       success: true,
       readingId,
       reading: readingResponse,
       usage: {
-        used: usage.used,
+        used:
+          usage.nextConsumeSource === "free"
+            ? usage.used + 1
+            : usage.used,
         limit: usage.limit,
-        remaining: null,
-        resetsAt: null,
+        remaining:
+          usage.remaining === null
+            ? null
+            : Math.max(0, usage.remaining - 1),
+        resetsAt: usage.resetsAt,
       },
       tier: tierInfo.tier,
     };

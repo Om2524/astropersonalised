@@ -4,6 +4,8 @@ import { api } from "../_generated/api";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
+const ANONYMOUS_PREVIEW_LIMIT = 1;
+
 type PublicAction = ReturnType<typeof action>;
 type AuthorizeStreamArgs = {
   sessionId: string;
@@ -98,17 +100,64 @@ export const authorizeStream: PublicAction = action({
         tier: tierInfo.tier,
       });
 
-      // Record usage for analytics — awaited (Convex throws on dangling promises)
-      // but errors are swallowed so a transient mutation failure never blocks
-      // the stream token from being issued.
-      try {
-        await ctx.runMutation(api.functions.queryUsage.recordUsage, {
-          sessionId: args.sessionId,
+      const usageSnapshot: UsageSnapshot = {
+        used: usage.used,
+        limit: usage.limit,
+        remaining: usage.remaining,
+        resetsAt: usage.resetsAt,
+      };
+
+      // 3a. Rate limit enforcement
+      if (!usage.allowed) {
+        return {
+          success: false,
+          error: "rate_limit_exceeded",
+          message:
+            "You're out of messages. Buy a 50-message pack or go Moksha Unlimited.",
+          usage: usageSnapshot,
+          tier: tierInfo.tier,
+          token: null,
+          expiresAt: null,
+          streamUrl: null,
+        };
+      }
+
+      // 3b. Anonymous preview limit — require sign-in after first message
+      if (!args.userId && usage.used >= ANONYMOUS_PREVIEW_LIMIT) {
+        return {
+          success: false,
+          error: "auth_required",
+          message:
+            "Sign in to continue this conversation and save your astrology profile.",
+          usage: usageSnapshot,
+          tier: tierInfo.tier,
+          token: null,
+          expiresAt: null,
+          streamUrl: null,
+        };
+      }
+
+      // 4. Record usage based on consume source
+      if (usage.nextConsumeSource === "free") {
+        try {
+          await ctx.runMutation(api.functions.queryUsage.recordUsage, {
+            sessionId: args.sessionId,
+            userId: args.userId,
+            usageKey: args.usageKey,
+          });
+        } catch (usageErr) {
+          console.error("recordUsage failed (non-blocking):", usageErr);
+        }
+      } else if (usage.nextConsumeSource === "credit") {
+        if (!args.userId) {
+          throw new Error(
+            "Authenticated user required to spend message credits"
+          );
+        }
+        await ctx.runMutation(api.functions.queryUsage.recordCreditSpend, {
           userId: args.userId,
           usageKey: args.usageKey,
         });
-      } catch (usageErr) {
-        console.error("recordUsage failed (non-blocking):", usageErr);
       }
 
       // 5. Generate HMAC-SHA256 token
@@ -165,17 +214,23 @@ export const authorizeStream: PublicAction = action({
 
       const token = `${payloadB64}.${signatureB64}`;
 
-      // 6. Return token and usage
+      // 6. Return token and usage (reflect the just-consumed message)
       return {
         success: true,
         token,
         expiresAt,
         streamUrl: `${computeUrl}/v1/reading/stream`,
         usage: {
-          used: usage.used,
+          used:
+            usage.nextConsumeSource === "free"
+              ? usage.used + 1
+              : usage.used,
           limit: usage.limit,
-          remaining: null,
-          resetsAt: null,
+          remaining:
+            usage.remaining === null
+              ? null
+              : Math.max(0, usage.remaining - 1),
+          resetsAt: usage.resetsAt,
         },
         tier: tierInfo.tier,
         error: null,
