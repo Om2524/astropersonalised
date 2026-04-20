@@ -145,6 +145,30 @@ const schema = defineSchema({
   })
     .index("by_usageKey", ["usageKey"])
     .index("by_userId", ["userId", "spentAt"]),
+
+  /**
+   * Delivery preferences for outbound daily brief emails.
+   *
+   * Stored separately from auth user records so delivery metadata can
+   * evolve without coupling to the auth provider's schema.
+   */
+  emailBriefPreferences: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    dailyBriefEnabled: v.boolean(),
+    timezone: v.string(),
+    localSendHour: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastAttemptStatus: v.optional(v.string()),
+    lastAttemptedAt: v.optional(v.number()),
+    lastDeliveredAt: v.optional(v.number()),
+    lastDeliveredLocalDate: v.optional(v.string()),
+    lastMessageId: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_dailyBriefEnabled", ["dailyBriefEnabled", "updatedAt"]),
 });
 
 export default schema;

@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "forsee-mail",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-20",
+  "observability": {
+    "enabled": true
+  },
+
+  // Outbound email delivery binding.
+  // Cloudflare Email Service will enforce sender restrictions here.
+  "send_email": [
+    {
+      "name": "SEND_EMAIL",
+      "allowed_sender_addresses": [
+        "briefs@forsee.life",
+        "noreply@forsee.life"
+      ]
+    }
+  ]
+}

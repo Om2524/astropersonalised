@@ -18,14 +18,17 @@ import type * as actions_weeklyOutlook from "../actions/weeklyOutlook.js";
 import type * as auth from "../auth.js";
 import type * as billingConfig from "../billingConfig.js";
 import type * as crons from "../crons.js";
+import type * as emailBriefs from "../emailBriefs.js";
 import type * as functions_birthProfiles from "../functions/birthProfiles.js";
 import type * as functions_charts from "../functions/charts.js";
+import type * as functions_emailBriefs from "../functions/emailBriefs.js";
 import type * as functions_queryUsage from "../functions/queryUsage.js";
 import type * as functions_readings from "../functions/readings.js";
 import type * as functions_sessions from "../functions/sessions.js";
 import type * as functions_subscriptions from "../functions/subscriptions.js";
 import type * as functions_users from "../functions/users.js";
 import type * as http from "../http.js";
+import type * as lib_dailyBriefEmails from "../lib/dailyBriefEmails.js";
 import type * as polar from "../polar.js";
 
 import type {
@@ -45,14 +48,17 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   billingConfig: typeof billingConfig;
   crons: typeof crons;
+  emailBriefs: typeof emailBriefs;
   "functions/birthProfiles": typeof functions_birthProfiles;
   "functions/charts": typeof functions_charts;
+  "functions/emailBriefs": typeof functions_emailBriefs;
   "functions/queryUsage": typeof functions_queryUsage;
   "functions/readings": typeof functions_readings;
   "functions/sessions": typeof functions_sessions;
   "functions/subscriptions": typeof functions_subscriptions;
   "functions/users": typeof functions_users;
   http: typeof http;
+  "lib/dailyBriefEmails": typeof lib_dailyBriefEmails;
   polar: typeof polar;
 }>;
 

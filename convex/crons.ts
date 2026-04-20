@@ -29,4 +29,16 @@ crons.weekly(
   internal.functions.sessions.cleanupStale
 );
 
+/**
+ * Check once per hour for users whose local delivery window just opened.
+ *
+ * Each user stores a preferred timezone and local send hour, so the job
+ * can stay simple while still delivering on each user's morning schedule.
+ */
+crons.hourly(
+  "dispatch daily brief emails",
+  { minuteUTC: 5 },
+  internal.emailBriefs.dispatchDailyBriefEmails
+ );
+
 export default crons;
