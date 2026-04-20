@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAction, useMutation, useQuery, useConvex } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -154,6 +155,7 @@ function useStreamBuffer() {
 
 export default function ChatPage() {
   const { sessionId, profile, chart, chartRaw, tone, language } = useApp();
+  const router = useRouter();
   const { t } = useTranslation();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const subscription = useSubscription(sessionId, currentUser?._id);
@@ -190,6 +192,12 @@ export default function ChatPage() {
   useEffect(() => {
     prewarmCompute();
   }, []);
+
+  useEffect(() => {
+    if (currentUser === null) {
+      router.replace("/onboarding");
+    }
+  }, [currentUser, router]);
 
   useEffect(() => {
     if (!subscription.canCompare && method === "compare") {
