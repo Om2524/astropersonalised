@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { ArrowRight } from "lucide-react";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
@@ -9,12 +11,21 @@ import GalaxyLogo from "@/app/components/GalaxyLogo";
 export default function Home() {
   const router = useRouter();
   const { profile, chart } = useApp();
+  const currentUser = useQuery(api.functions.users.getCurrentUser, {});
 
   useEffect(() => {
-    if (profile && chart) {
+    if (currentUser === undefined) return; // still loading
+
+    if (currentUser && profile && chart) {
       router.push("/chat");
+      return;
     }
-  }, [profile, chart, router]);
+
+    if (currentUser && !profile) {
+      // authed but has not completed onboarding
+      router.push("/onboarding");
+    }
+  }, [currentUser, profile, chart, router]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4">
