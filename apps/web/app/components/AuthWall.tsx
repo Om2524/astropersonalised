@@ -10,6 +10,7 @@ interface AuthWallProps {
   onClose: () => void;
   reason?: string;
   redirectTo?: string;
+  dismissible?: boolean;
 }
 
 export default function AuthWall({
@@ -17,6 +18,7 @@ export default function AuthWall({
   onClose,
   reason = "Sign in to continue",
   redirectTo,
+  dismissible = true,
 }: AuthWallProps) {
   const { signIn } = useAuthActions();
 
@@ -79,18 +81,20 @@ export default function AuthWall({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
       />
 
       {/* Modal */}
       <div className="relative w-full max-w-sm mx-4 glass-section p-6 animate-fade-in">
-        <button
-          onClick={onClose}
-          className="absolute right-3 top-3 rounded-lg p-1.5 text-text-secondary hover:text-text-primary hover:bg-white/20 transition-colors"
-          aria-label="Close"
-        >
-          <X size={18} />
-        </button>
+        {dismissible && (
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-text-secondary hover:text-text-primary hover:bg-white/20 transition-colors"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        )}
 
         <div className="flex flex-col items-center mb-6">
           <GalaxyLogo size={40} />

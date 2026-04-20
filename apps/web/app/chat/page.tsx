@@ -50,6 +50,41 @@ const EXAMPLE_QUESTIONS = [
   "What are my strongest planetary influences?",
 ];
 
+const CLIENT_STREAM_TIMEOUT_MS = 120_000;
+const PENDING_QUERY_STORAGE_KEY = "shastra_pending_query";
+
+type PendingQuery = {
+  query: string;
+  method: string;
+  createdAt: number;
+};
+
+function savePendingQuery(pending: PendingQuery) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(PENDING_QUERY_STORAGE_KEY, JSON.stringify(pending));
+}
+
+function loadPendingQuery(): PendingQuery | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.sessionStorage.getItem(PENDING_QUERY_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as PendingQuery;
+    if (typeof parsed?.query !== "string" || typeof parsed?.method !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingQuery() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(PENDING_QUERY_STORAGE_KEY);
+}
+
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -130,8 +165,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAuthWall, setShowAuthWall] = useState(false);
-  const [hasConsumedAnonymousQuery, setHasConsumedAnonymousQuery] = useState(false);
-  const [hasShownAuthPrompt, setHasShownAuthPrompt] = useState(false);
   const [ledgerSteps, setLedgerSteps] = useState<
     { step: number; message: string }[]
   >([]);
@@ -141,6 +174,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const replayingPendingQueryRef = useRef(false);
   const streamBuffer = useStreamBuffer();
 
   const scrollToBottom = useCallback(() => {
@@ -152,43 +186,29 @@ export default function ChatPage() {
   }, [messages, ledgerSteps, scrollToBottom]);
 
   useEffect(() => {
-    if (currentUser) {
-      setHasConsumedAnonymousQuery(false);
-      setHasShownAuthPrompt(false);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
     if (!subscription.canCompare && method === "compare") {
       setMethod("vedic");
     }
   }, [method, subscription.canCompare]);
 
-  const requiresLoginToContinue =
-    currentUser === null && (subscription.used > 0 || hasConsumedAnonymousQuery);
-
   useEffect(() => {
-    if (
-      !isLoading &&
-      messages.length > 0 &&
-      requiresLoginToContinue &&
-      !hasShownAuthPrompt
-    ) {
+    if (currentUser === null && loadPendingQuery()) {
       setShowAuthWall(true);
-      setHasShownAuthPrompt(true);
     }
-  }, [
-    hasShownAuthPrompt,
-    isLoading,
-    messages.length,
-    requiresLoginToContinue,
-  ]);
+  }, [currentUser]);
 
   const handleSubmit = useCallback(
-    async (query: string) => {
+    async (query: string, methodOverride?: string) => {
       if (isLoading || currentUser === undefined) return;
+      const selectedMethod = methodOverride ?? method;
 
-      if (requiresLoginToContinue) {
+      if (currentUser === null) {
+        savePendingQuery({
+          query,
+          method: selectedMethod,
+          createdAt: Date.now(),
+        });
+        setMethod(selectedMethod);
         setShowAuthWall(true);
         return;
       }
@@ -210,7 +230,7 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       posthog.capture('message_sent', {
-        method,
+        method: selectedMethod,
         tone: profile?.tone,
       });
       setIsLoading(true);
@@ -220,6 +240,13 @@ export default function ChatPage() {
       const controller = new AbortController();
       abortRef.current = () => controller.abort();
 
+      let fullContent = "";
+      let classification: Record<string, unknown> | undefined;
+      let evidenceSummary: Record<string, unknown> | undefined;
+      let planetContext: PlanetContext | undefined;
+      let receivedDoneEvent = false;
+      let receivedErrorEvent = false;
+
       try {
         // Authorize the stream via Convex (handles rate limiting + HMAC token)
         const authResult = await authorizeStreamAction({
@@ -227,12 +254,16 @@ export default function ChatPage() {
           userId: currentUser?._id ?? undefined,
           usageKey: assistantId,
           query,
-          method,
+          method: selectedMethod,
         });
 
         if (!authResult.success || !authResult.token || !authResult.streamUrl) {
           if (authResult.error === "auth_required") {
-            setHasConsumedAnonymousQuery(true);
+            savePendingQuery({
+              query,
+              method: selectedMethod,
+              createdAt: Date.now(),
+            });
             setShowAuthWall(true);
           }
 
@@ -254,16 +285,6 @@ export default function ChatPage() {
           return;
         }
 
-        if (currentUser === null) {
-          setHasConsumedAnonymousQuery(true);
-        }
-
-        // Open SSE connection directly to the Python API
-        let fullContent = "";
-        let classification: Record<string, unknown> | undefined;
-        let evidenceSummary: Record<string, unknown> | undefined;
-        let planetContext: PlanetContext | undefined;
-
         streamBuffer.start((revealed) => {
           setMessages((prev) =>
             prev.map((m) =>
@@ -272,8 +293,8 @@ export default function ChatPage() {
           );
         });
 
-        // Merge user-abort and 45s timeout into a single signal
-        const timeoutSignal = AbortSignal.timeout(45_000);
+        // Merge user-abort and the client timeout into a single signal
+        const timeoutSignal = AbortSignal.timeout(CLIENT_STREAM_TIMEOUT_MS);
         const mergedSignal = AbortSignal.any([controller.signal, timeoutSignal]);
 
         const res = await fetch(authResult.streamUrl, {
@@ -284,7 +305,7 @@ export default function ChatPage() {
           },
           body: JSON.stringify({
             query,
-            method,
+            method: selectedMethod,
             chart_data: chartRaw ? JSON.parse(chartRaw).chart : {},
             tone: tone || "practical",
             language: language || "en",
@@ -365,6 +386,7 @@ export default function ChatPage() {
                   streamBuffer.push(parsed.text);
                   break;
                 case "done": {
+                  receivedDoneEvent = true;
                   streamBuffer.flush();
                   streamBuffer.stop();
                   setLedgerComplete(true);
@@ -396,7 +418,7 @@ export default function ChatPage() {
                     sessionId,
                     userId: currentUser?._id ?? undefined,
                     query,
-                    method: methodUsed ?? method,
+                    method: methodUsed ?? selectedMethod,
                     domain: cls?.domain ?? "general",
                     classification: JSON.stringify(cls ?? {}),
                     evidenceSummary: JSON.stringify(evidenceSummary ?? {}),
@@ -406,12 +428,13 @@ export default function ChatPage() {
                   );
 
                   posthog.capture('reading_received', {
-                    method: methodUsed || method,
+                    method: methodUsed || selectedMethod,
                   });
 
                   break;
                 }
                 case "error":
+                  receivedErrorEvent = true;
                   streamBuffer.stop();
                   setMessages((prev) =>
                     prev.map((m) =>
@@ -435,14 +458,24 @@ export default function ChatPage() {
 
         readerRef.current = null;
 
-        // If stream ended without a "done" event
-        if (isLoading) {
+        // Recover if the stream closes without sending its final "done" event.
+        if (!receivedDoneEvent && !receivedErrorEvent) {
           streamBuffer.flush();
           streamBuffer.stop();
+          const fallbackContent =
+            fullContent ||
+            "The reading ended before the final answer arrived. Please try again.";
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId && !m.reading
-                ? { ...m, content: fullContent || m.content }
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: fallbackContent,
+                    classification:
+                      classification as ChatMessage["classification"],
+                    evidence_summary: evidenceSummary,
+                    planet_context: planetContext,
+                  }
                 : m
             )
           );
@@ -456,7 +489,7 @@ export default function ChatPage() {
               sessionId,
               userId: currentUser?._id ?? undefined,
               query,
-              method,
+              method: selectedMethod,
               domain: cls?.domain ?? "general",
               classification: JSON.stringify(cls ?? {}),
               evidenceSummary: JSON.stringify(evidenceSummary ?? {}),
@@ -479,9 +512,11 @@ export default function ChatPage() {
         const isTimeout =
           (err as Error).name === "TimeoutError" ||
           ((err as Error).name === "AbortError" && !controller.signal.aborted);
-        const message = isTimeout
-          ? "The stars are taking longer than usual... Please try again."
-          : `Something went wrong: ${(err as Error).message}. Please try again.`;
+        const message = fullContent
+          ? fullContent
+          : isTimeout
+            ? "The stars are taking longer than usual... Please try again."
+            : `Something went wrong: ${(err as Error).message}. Please try again.`;
 
         streamBuffer.stop();
         setMessages((prev) =>
@@ -503,12 +538,39 @@ export default function ChatPage() {
       tone,
       currentUser?._id,
       currentUser,
-      requiresLoginToContinue,
       authorizeStreamAction,
       storeReading,
       streamBuffer,
     ]
   );
+
+  useEffect(() => {
+    if (
+      currentUser === undefined ||
+      currentUser === null ||
+      isLoading ||
+      !chartRaw ||
+      replayingPendingQueryRef.current
+    ) {
+      return;
+    }
+
+    const pending = loadPendingQuery();
+    if (!pending) return;
+
+    replayingPendingQueryRef.current = true;
+    clearPendingQuery();
+    setShowAuthWall(false);
+
+    void (async () => {
+      try {
+        setMethod(pending.method);
+        await handleSubmit(pending.query, pending.method);
+      } finally {
+        replayingPendingQueryRef.current = false;
+      }
+    })();
+  }, [chartRaw, currentUser, isLoading, handleSubmit]);
 
   const handleNewReading = useCallback(() => {
     if (abortRef.current) {
@@ -669,6 +731,18 @@ export default function ChatPage() {
                             />
                           )}
 
+                        {msg.reading?.direct_answer && !isLoading && (
+                          <div className="mb-3 rounded-2xl border border-white/55 bg-white/45 px-4 py-3 shadow-[0_4px_18px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent/80">
+                              Direct Answer
+                            </p>
+                            <StreamingMarkdown
+                              content={msg.reading.direct_answer}
+                              isStreaming={false}
+                            />
+                          </div>
+                        )}
+
                         {msg.planet_context && !isLoading && (
                           <div className="mb-3">
                             <PlanetCards planets={msg.planet_context.planets} />
@@ -684,6 +758,7 @@ export default function ChatPage() {
                           <ReadingCard
                             reading={msg.reading}
                             onAskFollowUp={handleFollowUp}
+                            hideDirectAnswer
                           />
                         ) : msg.content ? (
                           (() => {
@@ -768,7 +843,8 @@ export default function ChatPage() {
       <AuthWall
         isOpen={showAuthWall}
         onClose={() => setShowAuthWall(false)}
-        reason="Sign in to continue your reading"
+        reason="Sign in to ask your first question"
+        dismissible={currentUser !== null}
       />
     </div>
   );

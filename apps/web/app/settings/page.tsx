@@ -6,7 +6,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   ArrowLeft, Calendar, Clock, MapPin, Briefcase, Heart, Sparkles, AlignLeft,
-  Loader2, Trash2, AlertCircle, Crown, ExternalLink,
+  Loader2, AlertCircle, Crown, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/app/store";
@@ -48,7 +48,6 @@ export default function SettingsPage() {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
 
   async function handleUpdateChart(e: FormEvent) {
     e.preventDefault();
@@ -117,11 +116,6 @@ export default function SettingsPage() {
     } finally {
       setPortalLoading(false);
     }
-  }
-
-  function handleClearData() {
-    if (typeof window !== "undefined") localStorage.clear();
-    window.location.href = "/";
   }
 
   return (
@@ -255,22 +249,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Data */}
-        <section className="glass-section p-5">
-          <h2 className="text-lg font-semibold text-text-primary mb-1">Data</h2>
-          <p className="text-xs text-text-secondary mb-5">Manage your local data.</p>
-          <p className="text-xs text-text-secondary/70 mb-3">This will remove your local session data. Your Convex data remains intact.</p>
-          {!confirmClear ? (
-            <button type="button" onClick={() => setConfirmClear(true)} className="flex items-center gap-2 rounded-xl border border-red-400/25 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50/50 transition-colors">
-              <Trash2 size={16} />Clear Local Data
-            </button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={handleClearData} className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 transition-colors"><Trash2 size={16} />Confirm Clear</button>
-              <button type="button" onClick={() => setConfirmClear(false)} className="rounded-xl border border-black/10 px-4 py-2.5 text-sm text-text-secondary hover:bg-white/20 transition-colors">Cancel</button>
-            </div>
-          )}
-        </section>
       </div>
     </div>
   );

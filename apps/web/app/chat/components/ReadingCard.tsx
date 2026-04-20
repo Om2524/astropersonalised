@@ -14,6 +14,7 @@ import ReactMarkdown from "react-markdown";
 interface ReadingCardProps {
   reading: ReadingResponse;
   onAskFollowUp?: (question: string) => void;
+  hideDirectAnswer?: boolean;
 }
 
 function CollapsibleSection({
@@ -54,13 +55,19 @@ function CollapsibleSection({
   );
 }
 
-export default function ReadingCard({ reading, onAskFollowUp }: ReadingCardProps) {
+export default function ReadingCard({
+  reading,
+  onAskFollowUp,
+  hideDirectAnswer = false,
+}: ReadingCardProps) {
   return (
     <div className="space-y-1">
       {/* Direct Answer */}
-      <div className="text-sm leading-relaxed text-text-primary">
-        <ReactMarkdown>{reading.direct_answer}</ReactMarkdown>
-      </div>
+      {!hideDirectAnswer && (
+        <div className="text-sm leading-relaxed text-text-primary">
+          <ReactMarkdown>{reading.direct_answer}</ReactMarkdown>
+        </div>
+      )}
 
       {/* Why This Answer */}
       {reading.why_this_answer && (
