@@ -2,24 +2,6 @@ import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 
 /**
- * Get the canonical chart for a session.
- *
- * @param sessionId - The anonymous session UUID
- * @returns The chart document or null
- */
-export const getBySession = query({
-  args: {
-    sessionId: v.string(),
-  },
-  handler: async (ctx, { sessionId }) => {
-    return await ctx.db
-      .query("canonicalCharts")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .unique();
-  },
-});
-
-/**
  * Get the canonical chart for an authenticated user.
  *
  * @param userId - The authenticated user's document ID
