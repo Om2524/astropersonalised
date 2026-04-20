@@ -24,6 +24,8 @@ import {
   getBirthProfileAnalyticsProperties,
   syncBirthProfilePersonProperties,
 } from "@/app/lib/posthogProfile";
+import GalaxyLogo from "@/app/components/GalaxyLogo";
+import AuthMethods from "@/app/components/AuthMethods";
 import { prewarmCompute } from "@/app/lib/prewarm";
 import posthog from "posthog-js";
 
@@ -39,16 +41,20 @@ const TONE_OPTIONS: {
   { value: "concise", label: "Concise", description: "Short, direct answers — no fluff", icon: AlignLeft },
 ];
 
-const STEPS = ["Birth Details", "Preferences", "Computing"];
+const STEPS = ["Sign Up", "Birth Details", "Preferences", "Computing"];
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { sessionId } = useApp();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
+  const birthProfile = useQuery(
+    api.functions.birthProfiles.getByUser,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
+  );
   const computeChartAction = useAction(api.actions.computeChart.computeChart);
   const registerSession = useMutation(api.functions.sessions.getOrCreate);
 
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [tob, setTob] = useState("");
@@ -63,6 +69,23 @@ export default function OnboardingPage() {
   useEffect(() => {
     prewarmCompute();
   }, []);
+
+  useEffect(() => {
+    if (currentUser === undefined) return; // still loading
+
+    if (currentUser && birthProfile) {
+      router.replace("/chat");
+      return;
+    }
+
+    if (currentUser) {
+      // authed but no profile yet — ensure we're on Step 1 or later
+      setStep((s) => (s === 0 ? 1 : s));
+    } else {
+      // not authed — force Step 0
+      setStep(0);
+    }
+  }, [currentUser, birthProfile, router]);
 
   const canContinueStep1 = dob.length > 0 && birthplace.trim().length > 0;
 
@@ -81,7 +104,7 @@ export default function OnboardingPage() {
       // and stores both the birth profile and chart in Convex
       await computeChartAction({
         sessionId,
-        userId: currentUser?._id ?? undefined,
+        userId: currentUser!._id,
         dateOfBirth: dob,
         timeOfBirth,
         birthplace: birthplace.trim(),
@@ -125,8 +148,8 @@ export default function OnboardingPage() {
 
   function handleContinue(e: FormEvent) {
     e.preventDefault();
-    if (step === 0 && canContinueStep1) setStep(1);
-    else if (step === 1) { setStep(2); computeChart(); }
+    if (step === 1 && canContinueStep1) setStep(2);
+    else if (step === 2) { setStep(3); computeChart(); }
   }
 
   return (
@@ -157,6 +180,21 @@ export default function OnboardingPage() {
       {/* Card */}
       <div className="w-full max-w-lg">
         {step === 0 && (
+          <div className="animate-fade-in glass-section p-6">
+            <div className="flex flex-col items-center mb-6">
+              <GalaxyLogo size={48} />
+              <h1 className="mt-3 text-xl font-semibold text-text-primary">
+                Create your account to begin
+              </h1>
+              <p className="mt-1 text-xs text-text-secondary text-center max-w-xs">
+                We&apos;ll save your birth chart and readings to your account.
+              </p>
+            </div>
+            <AuthMethods redirectTo="/onboarding" />
+          </div>
+        )}
+
+        {step === 1 && (
           <form onSubmit={handleContinue} className="animate-fade-in glass-section p-6">
             <h1 className="text-2xl font-semibold text-text-primary mb-1">Your Birth Details</h1>
             <p className="text-text-secondary text-sm mb-8">We use this to compute your unique birth chart.</p>
@@ -213,7 +251,7 @@ export default function OnboardingPage() {
           </form>
         )}
 
-        {step === 1 && (
+        {step === 2 && (
           <div className="animate-fade-in glass-section p-6">
             {/* Language selector */}
             <h2 className="text-lg font-semibold text-text-primary mb-1">Language</h2>
@@ -253,7 +291,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => setStep(0)} className="flex items-center justify-center gap-1 rounded-xl border border-black/10 text-text-secondary font-medium py-3 px-5 hover:bg-white/20 transition">
+              <button type="button" onClick={() => setStep(1)} className="flex items-center justify-center gap-1 rounded-xl border border-black/10 text-text-secondary font-medium py-3 px-5 hover:bg-white/20 transition">
                 <ChevronLeft size={18} /> Back
               </button>
               <button type="button" onClick={handleContinue as () => void} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-accent text-white font-semibold py-3 hover:brightness-110 transition">
@@ -263,7 +301,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="animate-fade-in glass-section p-6 flex flex-col items-center text-center py-16">
             {computing && !error && (
               <>
@@ -278,7 +316,7 @@ export default function OnboardingPage() {
                 <h2 className="text-xl font-semibold text-text-primary mb-2">Something went wrong</h2>
                 <p className="text-text-secondary text-sm max-w-sm mb-6">{error}</p>
                 <div className="flex gap-3">
-                  <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1 rounded-xl border border-black/10 text-text-secondary font-medium py-2.5 px-5 hover:bg-white/20 transition">
+                  <button type="button" onClick={() => setStep(2)} className="flex items-center gap-1 rounded-xl border border-black/10 text-text-secondary font-medium py-2.5 px-5 hover:bg-white/20 transition">
                     <ChevronLeft size={18} /> Back
                   </button>
                   <button type="button" onClick={() => computeChart()} className="flex items-center gap-2 rounded-xl bg-accent text-white font-semibold py-2.5 px-6 hover:brightness-110 transition">
