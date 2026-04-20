@@ -8,6 +8,7 @@ import {
 
 /** Rolling window duration: 7 days in milliseconds. */
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const GUEST_PREVIEW_MESSAGE_LIMIT = 1;
 
 const UNLIMITED_RESPONSE = {
   allowed: true,
@@ -26,9 +27,10 @@ const UNLIMITED_RESPONSE = {
  * Check whether a user can send another message.
  *
  * Entitlement model:
+ * - Guests: 1 preview message per rolling 7-day window
  * - Admin emails or `unlimitedQueries` flag: unlimited
  * - `moksha` tier: unlimited
- * - Everyone else: 5 free messages per rolling 7-day window
+ * - Authenticated users: 5 free messages per rolling 7-day window
  * - Authenticated users can extend with purchased message credits
  */
 export const checkLimit = query({
@@ -74,8 +76,11 @@ export const checkLimit = query({
         .collect();
     }
 
+    const freeMessageLimit = userId
+      ? FREE_WEEKLY_MESSAGE_LIMIT
+      : GUEST_PREVIEW_MESSAGE_LIMIT;
     const used = usageRecords.length;
-    const freeRemaining = Math.max(0, FREE_WEEKLY_MESSAGE_LIMIT - used);
+    const freeRemaining = Math.max(0, freeMessageLimit - used);
 
     // 4. Count credit balance for authenticated users
     let creditBalance = 0;
@@ -114,7 +119,7 @@ export const checkLimit = query({
     return {
       allowed,
       used,
-      limit: FREE_WEEKLY_MESSAGE_LIMIT,
+      limit: freeMessageLimit,
       remaining: messagesAvailable,
       resetsAt,
       freeRemaining,

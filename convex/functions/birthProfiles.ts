@@ -20,6 +20,24 @@ export const getByUser = query({
 });
 
 /**
+ * Get the birth profile for a guest session.
+ *
+ * @param sessionId - The anonymous session UUID
+ * @returns The birth profile document or null
+ */
+export const getBySession = query({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    return await ctx.db
+      .query("birthProfiles")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .unique();
+  },
+});
+
+/**
  * Create or update the birth profile for a session.
  *
  * Uses upsert pattern: if a profile exists for the sessionId,

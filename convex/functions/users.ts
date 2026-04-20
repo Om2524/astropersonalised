@@ -1,4 +1,4 @@
-import { query, internalMutation } from "../_generated/server";
+import { mutation, query, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -47,3 +47,68 @@ export const grantUnlimitedQueries = internalMutation({
   },
 });
 
+/**
+ * Migrate all guest-session records onto an authenticated user.
+ *
+ * The data model still keeps session-linked records so a guest can
+ * continue seamlessly after sign-up. This mutation links the current
+ * session's records to the newly authenticated user.
+ */
+export const migrateSession = mutation({
+  args: {
+    sessionId: v.string(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, { sessionId, userId }) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .unique();
+
+    if (session) {
+      await ctx.db.patch(session._id, { userId });
+    }
+
+    const birthProfiles = await ctx.db
+      .query("birthProfiles")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .collect();
+    for (const profile of birthProfiles) {
+      await ctx.db.patch(profile._id, { userId });
+    }
+
+    const charts = await ctx.db
+      .query("canonicalCharts")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .collect();
+    for (const chart of charts) {
+      await ctx.db.patch(chart._id, { userId });
+    }
+
+    const readings = await ctx.db
+      .query("readings")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .collect();
+    for (const reading of readings) {
+      await ctx.db.patch(reading._id, { userId });
+    }
+
+    const usageRecords = await ctx.db
+      .query("queryUsage")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .collect();
+    for (const usage of usageRecords) {
+      await ctx.db.patch(usage._id, { userId });
+    }
+
+    return {
+      migrated: {
+        sessions: session ? 1 : 0,
+        birthProfiles: birthProfiles.length,
+        charts: charts.length,
+        readings: readings.length,
+        queryUsage: usageRecords.length,
+      },
+    };
+  },
+});

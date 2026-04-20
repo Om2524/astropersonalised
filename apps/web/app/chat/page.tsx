@@ -20,6 +20,7 @@ import DashaBadge from "./components/DashaBadge";
 import RetryPrompt from "./components/RetryPrompt";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
+import AuthWall from "@/app/components/AuthWall";
 import { useTranslation } from "@/app/i18n/useTranslation";
 import { prewarmCompute } from "@/app/lib/prewarm";
 import posthog from "posthog-js";
@@ -44,13 +45,6 @@ function parseExploreFurther(content: string): {
 
   return { body, questions };
 }
-
-const EXAMPLE_QUESTIONS = [
-  "What does my chart say about my career path?",
-  "When is a good time for a major decision?",
-  "How do my relationships look this year?",
-  "What are my strongest planetary influences?",
-];
 
 const CLIENT_STREAM_TIMEOUT_MS = 120_000;
 
@@ -120,7 +114,7 @@ function useStreamBuffer() {
 }
 
 export default function ChatPage() {
-  const { sessionId, profile, chart, chartRaw, tone, language } = useApp();
+  const { sessionId, chartRaw, tone, language, ready, dataResolved } = useApp();
   const router = useRouter();
   const { t } = useTranslation();
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
@@ -139,10 +133,12 @@ export default function ChatPage() {
   >([]);
   const [ledgerComplete, setLedgerComplete] = useState(false);
   const [activeReadingId, setActiveReadingId] = useState<string | null>(null);
+  const [showAuthWall, setShowAuthWall] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const authWallTrackedRef = useRef(false);
   const streamBuffer = useStreamBuffer();
 
   const scrollToBottom = useCallback(() => {
@@ -158,10 +154,42 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if (currentUser === null) {
+    if (dataResolved && !ready) {
       router.replace("/onboarding");
     }
-  }, [currentUser, router]);
+  }, [dataResolved, ready, router]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setShowAuthWall(false);
+      authWallTrackedRef.current = false;
+      return;
+    }
+    if (!dataResolved || subscription.loading) return;
+
+    if (!subscription.allowed) {
+      setShowAuthWall(true);
+      if (!authWallTrackedRef.current) {
+        posthog.capture("guest_signup_required_shown", {
+          session_id: sessionId,
+          used: subscription.used,
+          limit: subscription.limit,
+        });
+        authWallTrackedRef.current = true;
+      }
+      return;
+    }
+
+    authWallTrackedRef.current = false;
+  }, [
+    currentUser,
+    dataResolved,
+    sessionId,
+    subscription.allowed,
+    subscription.limit,
+    subscription.loading,
+    subscription.used,
+  ]);
 
   useEffect(() => {
     if (!subscription.canCompare && method === "compare") {
@@ -171,7 +199,11 @@ export default function ChatPage() {
 
   const handleSubmit = useCallback(
     async (query: string, methodOverride?: string) => {
-      if (isLoading || currentUser === undefined) return;
+      if (isLoading || currentUser === undefined || !ready) return;
+      if (!currentUser && !subscription.loading && !subscription.allowed) {
+        setShowAuthWall(true);
+        return;
+      }
       const selectedMethod = methodOverride ?? method;
 
       const userMsg: ChatMessage = {
@@ -190,9 +222,9 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      posthog.capture('message_sent', {
+      posthog.capture("message_sent", {
         method: selectedMethod,
-        tone: profile?.tone,
+        tone,
       });
       setIsLoading(true);
       setLedgerSteps([]);
@@ -219,6 +251,9 @@ export default function ChatPage() {
         });
 
         if (!authResult.success || !authResult.token || !authResult.streamUrl) {
+          if (authResult.error === "auth_required") {
+            setShowAuthWall(true);
+          }
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -497,11 +532,14 @@ export default function ChatPage() {
     [
       isLoading,
       method,
+      ready,
       sessionId,
       chartRaw,
       tone,
       currentUser?._id,
       currentUser,
+      subscription.allowed,
+      subscription.loading,
       authorizeStreamAction,
       storeReading,
       streamBuffer,
@@ -599,6 +637,14 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden">
+      <AuthWall
+        isOpen={showAuthWall}
+        onClose={() => {}}
+        dismissible={false}
+        reason="Sign up to continue after your first reading"
+        redirectTo="/chat"
+      />
+
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}

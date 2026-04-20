@@ -107,26 +107,13 @@ export const authorizeStream: PublicAction = action({
 
       // 3a. Rate limit enforcement
       if (!usage.allowed) {
+        const requiresSignup = !args.userId;
         return {
           success: false,
-          error: "rate_limit_exceeded",
-          message:
-            "You're out of messages. Buy a 50-message pack or go Moksha Unlimited.",
-          usage: usageSnapshot,
-          tier: tierInfo.tier,
-          token: null,
-          expiresAt: null,
-          streamUrl: null,
-        };
-      }
-
-      // Account-first onboarding: /chat is unreachable without auth, so
-      // this branch is defensive. Reject anonymous requests outright.
-      if (!args.userId) {
-        return {
-          success: false,
-          error: "auth_required",
-          message: "Please sign in to continue.",
+          error: requiresSignup ? "auth_required" : "rate_limit_exceeded",
+          message: requiresSignup
+            ? "Sign up to continue after your first reading."
+            : "You're out of messages. Buy a 50-message pack or go Moksha Unlimited.",
           usage: usageSnapshot,
           tier: tierInfo.tier,
           token: null,

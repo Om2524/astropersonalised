@@ -7,8 +7,9 @@ import {
   useEffect,
   ReactNode,
   useMemo,
+  useRef,
 } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { CanonicalChart, UserProfile } from "@/app/types";
 import { syncBirthProfilePersonProperties } from "@/app/lib/posthogProfile";
@@ -24,6 +25,7 @@ interface AppState {
   tone: string;
   language: string;
   ready: boolean;
+  dataResolved: boolean;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -41,24 +43,44 @@ function getOrGenerateSessionId(): string {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const registerSession = useMutation(api.functions.sessions.getOrCreate);
+  const migrateSession = useMutation(api.functions.users.migrateSession);
+  const migrationRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setSessionId(getOrGenerateSessionId());
+    const id = getOrGenerateSessionId();
+    setSessionId(id);
     setHydrated(true);
-  }, []);
+    if (id) {
+      registerSession({ sessionId: id }).catch(() => {
+        // Session registration is best-effort and should not block the app.
+      });
+    }
+  }, [registerSession]);
 
   const currentUser = useQuery(api.functions.users.getCurrentUser, {});
   const userId = currentUser?._id;
 
-  const birthProfile = useQuery(
+  const birthProfileByUser = useQuery(
     api.functions.birthProfiles.getByUser,
     userId ? { userId } : "skip"
   );
+  const birthProfileBySession = useQuery(
+    api.functions.birthProfiles.getBySession,
+    sessionId ? { sessionId } : "skip"
+  );
 
-  const chartDoc = useQuery(
+  const chartDocByUser = useQuery(
     api.functions.charts.getByUser,
     userId ? { userId } : "skip"
   );
+  const chartDocBySession = useQuery(
+    api.functions.charts.getBySession,
+    sessionId ? { sessionId } : "skip"
+  );
+
+  const birthProfile = birthProfileByUser ?? birthProfileBySession;
+  const chartDoc = chartDocByUser ?? chartDocBySession;
 
   // Parse chart data from JSON string stored in Convex
   const chart: CanonicalChart | null = useMemo(() => {
@@ -91,8 +113,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [birthProfile]);
 
-  const tone = profile?.tone ?? "practical";
+  const tone = "practical";
   const language = profile?.language ?? "en";
+
+  const profileResolved = userId
+    ? birthProfileByUser !== undefined && birthProfileBySession !== undefined
+    : birthProfileBySession !== undefined;
+  const chartResolved = userId
+    ? chartDocByUser !== undefined && chartDocBySession !== undefined
+    : chartDocBySession !== undefined;
+  const dataResolved = sessionId.length > 0 && profileResolved && chartResolved;
+
+  useEffect(() => {
+    if (!sessionId || !currentUser?._id) return;
+
+    const migrationKey = `${sessionId}:${currentUser._id}`;
+    if (migrationRef.current === migrationKey) return;
+    migrationRef.current = migrationKey;
+
+    migrateSession({ sessionId, userId: currentUser._id })
+      .then((result) => {
+        const totalMigrated = (Object.values(result.migrated) as number[]).reduce(
+          (sum, count) => sum + count,
+          0
+        );
+
+        if (totalMigrated > 0) {
+          posthog.capture("guest_session_migrated", {
+            session_id: sessionId,
+            ...result.migrated,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to migrate guest session:", error);
+        migrationRef.current = null;
+      });
+  }, [currentUser?._id, migrateSession, sessionId]);
 
   // Identify authenticated user in PostHog
   useEffect(() => {
@@ -117,10 +174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Convex useQuery returns undefined while loading, null when no doc exists.
   // ready = queries finished AND data actually exists (not just "done loading").
-  const ready =
-    sessionId.length > 0 &&
-    profile !== null &&
-    chart !== null;
+  const ready = dataResolved && profile !== null && chart !== null;
 
   return (
     <AppContext.Provider
@@ -132,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tone,
         language,
         ready,
+        dataResolved,
       }}
     >
       {children}

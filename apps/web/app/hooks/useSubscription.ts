@@ -16,6 +16,7 @@ export function useSubscription(
   sessionId: string,
   userId?: Id<"users"> | null
 ) {
+  const fallbackLimit = userId ? 5 : 1;
   const tierInfo = useQuery(
     api.functions.subscriptions.getCurrentTier,
     sessionId
@@ -44,15 +45,15 @@ export function useSubscription(
   return {
     tier,
     isAuthenticated: tierInfo?.isAuthenticated ?? false,
-    limit: usageInfo?.limit ?? 5,
+    limit: usageInfo?.limit ?? fallbackLimit,
     used: usageInfo?.used ?? 0,
-    remaining: usageInfo?.remaining ?? 5,
+    remaining: usageInfo?.remaining ?? fallbackLimit,
     allowed: usageInfo?.allowed ?? true,
     resetsAt: usageInfo?.resetsAt ?? null,
     isUnlimited: usageInfo?.isUnlimited ?? false,
-    freeRemaining: usageInfo?.freeRemaining ?? 5,
+    freeRemaining: usageInfo?.freeRemaining ?? fallbackLimit,
     creditBalance: usageInfo?.creditBalance ?? 0,
-    messagesAvailable: usageInfo?.messagesAvailable ?? 5,
+    messagesAvailable: usageInfo?.messagesAvailable ?? fallbackLimit,
     canCompare: features.canCompare,
     canWeekly: features.canWeekly,
     loading: tierInfo === undefined || usageInfo === undefined,

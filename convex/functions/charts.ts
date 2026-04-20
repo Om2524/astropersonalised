@@ -20,6 +20,24 @@ export const getByUser = query({
 });
 
 /**
+ * Get the canonical chart for a guest session.
+ *
+ * @param sessionId - The anonymous session UUID
+ * @returns The chart document or null
+ */
+export const getBySession = query({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    return await ctx.db
+      .query("canonicalCharts")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .unique();
+  },
+});
+
+/**
  * Store or update a canonical chart for a session.
  *
  * Uses upsert pattern: if a chart exists for the sessionId,

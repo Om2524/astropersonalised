@@ -13,6 +13,7 @@ import type * as actions_authorizeStream from "../actions/authorizeStream.js";
 import type * as actions_computeChart from "../actions/computeChart.js";
 import type * as actions_dailyBrief from "../actions/dailyBrief.js";
 import type * as actions_personalityMatch from "../actions/personalityMatch.js";
+import type * as actions_placeSuggestions from "../actions/placeSuggestions.js";
 import type * as actions_weeklyOutlook from "../actions/weeklyOutlook.js";
 import type * as auth from "../auth.js";
 import type * as billingConfig from "../billingConfig.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "actions/computeChart": typeof actions_computeChart;
   "actions/dailyBrief": typeof actions_dailyBrief;
   "actions/personalityMatch": typeof actions_personalityMatch;
+  "actions/placeSuggestions": typeof actions_placeSuggestions;
   "actions/weeklyOutlook": typeof actions_weeklyOutlook;
   auth: typeof auth;
   billingConfig: typeof billingConfig;
