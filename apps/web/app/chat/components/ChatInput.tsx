@@ -68,6 +68,13 @@ export default function ChatInput({
     }
   };
 
+  const handleFocus = () => {
+    textareaRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  };
+
   const availableMethods = canCompare
     ? METHODS
     : METHODS.filter((m) => m.value !== "compare");
@@ -87,6 +94,7 @@ export default function ChatInput({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
           placeholder="Ask about your career, love, timing, purpose..."
           rows={1}
           disabled={isLoading}

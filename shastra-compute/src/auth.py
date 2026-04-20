@@ -80,6 +80,7 @@ async def verify_stream_token(
         {
             "sessionId": str,
             "userId": str | null,
+            "usageKey": str,
             "queriedAt": int,   # milliseconds (JS Date.now())
             "exp": int          # milliseconds (JS Date.now() + 60_000)
         }

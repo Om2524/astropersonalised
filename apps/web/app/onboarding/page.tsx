@@ -20,6 +20,10 @@ import { api } from "@convex/_generated/api";
 import { useApp } from "@/app/store";
 import { UserProfile } from "@/app/types";
 import { LANGUAGES } from "@/app/i18n/translations";
+import {
+  getBirthProfileAnalyticsProperties,
+  syncBirthProfilePersonProperties,
+} from "@/app/lib/posthogProfile";
 import posthog from "posthog-js";
 
 const TONE_OPTIONS: {
@@ -86,11 +90,25 @@ export default function OnboardingPage() {
         language,
       });
 
-      posthog.capture('onboarding_completed', {
-        birthTimeQuality,
+      const birthProfile = {
+        date_of_birth: dob,
+        time_of_birth: timeOfBirth,
+        birthplace: birthplace.trim(),
+        birth_time_quality: birthTimeQuality,
         tone,
-        timeOfBirthProvided: !unknownTime && !!tob,
+        language,
+      } satisfies UserProfile;
+      const analyticsProperties = {
+        ...getBirthProfileAnalyticsProperties(birthProfile),
+        source: "onboarding",
+        name_provided: name.trim().length > 0,
+      };
+
+      posthog.capture("birth_profile_saved", analyticsProperties);
+      posthog.capture('onboarding_completed', {
+        ...analyticsProperties,
       });
+      syncBirthProfilePersonProperties(birthProfile);
 
       router.push("/chat");
     } catch (err: unknown) {

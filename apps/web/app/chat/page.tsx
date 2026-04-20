@@ -588,7 +588,7 @@ export default function ChatPage() {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh min-h-0 overflow-hidden">
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
@@ -597,7 +597,7 @@ export default function ChatPage() {
         activeReadingId={activeReadingId}
       />
 
-      <main className="flex flex-1 flex-col overflow-hidden relative">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {isEmpty ? (
           /* ============ WELCOME SCREEN ============ */
           <div className="flex flex-1 flex-col items-center justify-center px-4">
@@ -649,7 +649,7 @@ export default function ChatPage() {
         ) : (
           /* ============ CONVERSATION VIEW ============ */
           <>
-            <div className="flex-1 overflow-y-auto scroll-smooth px-4 py-6 lg:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-4 py-6 pb-28 lg:px-6 lg:pb-32">
               <div className="mx-auto max-w-2xl space-y-6">
                 {messages.map((msg) => (
                   <div key={msg.id}>
@@ -738,7 +738,7 @@ export default function ChatPage() {
             </div>
 
             {/* Bottom input */}
-            <div className="relative z-10 px-4 py-3 lg:px-6">
+            <div className="sticky bottom-0 z-10 border-t border-white/30 bg-white/12 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl lg:px-6">
               <div className="mx-auto max-w-2xl">
                 <ChatInput
                   onSubmit={handleSubmit}

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     stream_timeout_seconds: int = 120
     environment: str = "development"
     log_level: str = "INFO"
+    posthog_project_api_key: str = ""
+    posthog_host: str = "https://us.i.posthog.com"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

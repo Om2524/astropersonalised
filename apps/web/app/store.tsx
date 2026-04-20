@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { CanonicalChart, UserProfile } from "@/app/types";
+import { syncBirthProfilePersonProperties } from "@/app/lib/posthogProfile";
 import posthog from "posthog-js";
 
 const SESSION_KEY = "shastra_session_id";
@@ -138,6 +139,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?._id || !profile) return;
+    syncBirthProfilePersonProperties(profile);
+  }, [currentUser?._id, profile]);
 
   // Don't render until client-side hydration is complete
   if (!hydrated) return null;

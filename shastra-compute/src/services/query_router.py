@@ -44,7 +44,11 @@ class QueryRouter:
         """Initialize the query router (no API key needed; llm_client reads settings)."""
         pass
 
-    def classify(self, query: str) -> QueryClassification:
+    def classify(
+        self,
+        query: str,
+        telemetry: llm_client.LLMTelemetry | None = None,
+    ) -> QueryClassification:
         """Classify a user's astrology question into structured metadata."""
         prompt = (
             "You are an astrology query classifier. Analyze the user's question "
@@ -85,6 +89,11 @@ class QueryRouter:
             f'User question: "{query}"'
         )
 
-        text = llm_client.generate(prompt, json_mode=True)
+        text = llm_client.generate(
+            prompt,
+            json_mode=True,
+            capture_input=query,
+            telemetry=telemetry,
+        )
         data = json.loads(text)
         return QueryClassification(**data)

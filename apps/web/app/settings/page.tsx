@@ -12,6 +12,11 @@ import Link from "next/link";
 import { useApp } from "@/app/store";
 import { useSubscription } from "@/app/hooks/useSubscription";
 import { UserProfile } from "@/app/types";
+import {
+  getBirthProfileAnalyticsProperties,
+  syncBirthProfilePersonProperties,
+} from "@/app/lib/posthogProfile";
+import posthog from "posthog-js";
 
 const TONE_OPTIONS: { value: UserProfile["tone"]; label: string; description: string; icon: typeof Briefcase }[] = [
   { value: "practical", label: "Practical", description: "Actionable advice you can apply today", icon: Briefcase },
@@ -63,7 +68,23 @@ export default function SettingsPage() {
         timezone: "UTC",
         birthTimeQuality: timeQuality,
         tone,
+        language: profile?.language ?? "en",
       });
+
+      const updatedProfile = {
+        date_of_birth: dob,
+        time_of_birth: tob || undefined,
+        birthplace: birthplace.trim(),
+        birth_time_quality: timeQuality,
+        tone,
+        language: profile?.language ?? "en",
+      } satisfies UserProfile;
+
+      posthog.capture("birth_profile_updated", {
+        ...getBirthProfileAnalyticsProperties(updatedProfile),
+        source: "settings",
+      });
+      syncBirthProfilePersonProperties(updatedProfile);
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (err) {

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -149,6 +150,23 @@ async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingRespon
     """Stream a reading with analysis ledger events (SSE)."""
 
     timeout = settings.stream_timeout_seconds
+    distinct_id = _auth.get("userId") or _auth.get("sessionId")
+    trace_id = _auth.get("usageKey") or f"reading_{uuid4().hex}"
+
+    def build_telemetry(stage: str, **extra_properties: object) -> dict[str, object]:
+        return {
+            "distinct_id": distinct_id,
+            "trace_id": trace_id,
+            "properties": {
+                "llm_stage": stage,
+                "route": "reading_stream",
+                "requested_method": req.method,
+                "tone": req.tone,
+                "language": req.language,
+                "birth_time_quality": req.birth_time_quality,
+                **extra_properties,
+            },
+        }
 
     async def event_stream():
         try:
@@ -161,7 +179,10 @@ async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingRespon
                 yield _sse_event("ledger", {"step": 2, "message": LEDGER_STEPS[1]})
 
                 # 2. Classify query
-                classification = _query_router.classify(req.query)
+                classification = _query_router.classify(
+                    req.query,
+                    telemetry=build_telemetry("query_classification"),
+                )
                 yield _sse_event("classification", classification.model_dump())
 
                 # 3. Determine method
@@ -214,6 +235,13 @@ async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingRespon
                     tone=req.tone,
                     birth_time_quality=req.birth_time_quality,
                     language=req.language,
+                    telemetry=build_telemetry(
+                        "answer_composition",
+                        resolved_method=method,
+                        query_domain=classification.domain,
+                        response_mode="stream",
+                        best_fit_engine=classification.best_fit_engine,
+                    ),
                 ):
                     yield _sse_event("content", {"text": chunk})
 

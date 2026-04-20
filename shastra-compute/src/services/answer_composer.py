@@ -58,11 +58,17 @@ class AnswerComposer:
         tone: str = "practical",
         birth_time_quality: str = "exact",
         language: str = "en",
+        telemetry: llm_client.LLMTelemetry | None = None,
     ) -> ReadingResponse:
         """Compose a structured reading from evidence (non-streaming)."""
         prompt = self._build_prompt(query, evidence, method, tone, birth_time_quality, language)
 
-        text = llm_client.generate(prompt, json_mode=True)
+        text = llm_client.generate(
+            prompt,
+            json_mode=True,
+            capture_input=query,
+            telemetry=telemetry,
+        )
         data = json.loads(text)
         data["raw_text"] = self._format_reading(data)
         return ReadingResponse(**data)
@@ -75,13 +81,18 @@ class AnswerComposer:
         tone: str = "practical",
         birth_time_quality: str = "exact",
         language: str = "en",
+        telemetry: llm_client.LLMTelemetry | None = None,
     ) -> Generator[str, None, None]:
         """Stream the reading text chunk by chunk."""
         prompt = self._build_prompt_freeform(
             query, evidence, method, tone, birth_time_quality, language
         )
 
-        yield from llm_client.generate_stream(prompt)
+        yield from llm_client.generate_stream(
+            prompt,
+            capture_input=query,
+            telemetry=telemetry,
+        )
 
     def _build_prompt(self, query, evidence, method, tone, birth_time_quality, language="en"):
         """Build the structured JSON prompt for non-streaming readings."""

@@ -177,6 +177,7 @@ export const authorizeStream: PublicAction = action({
       const payload = {
         sessionId: args.sessionId,
         userId: args.userId ?? null,
+        usageKey: args.usageKey,
         queriedAt: now,
         exp: expiresAt,
       };
