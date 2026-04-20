@@ -20,7 +20,6 @@ import DashaBadge from "./components/DashaBadge";
 import RetryPrompt from "./components/RetryPrompt";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
-import AuthWall from "@/app/components/AuthWall";
 import { useTranslation } from "@/app/i18n/useTranslation";
 import { prewarmCompute } from "@/app/lib/prewarm";
 import posthog from "posthog-js";
@@ -54,39 +53,6 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 const CLIENT_STREAM_TIMEOUT_MS = 120_000;
-const PENDING_QUERY_STORAGE_KEY = "shastra_pending_query";
-
-type PendingQuery = {
-  query: string;
-  method: string;
-  createdAt: number;
-};
-
-function savePendingQuery(pending: PendingQuery) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(PENDING_QUERY_STORAGE_KEY, JSON.stringify(pending));
-}
-
-function loadPendingQuery(): PendingQuery | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.sessionStorage.getItem(PENDING_QUERY_STORAGE_KEY);
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as PendingQuery;
-    if (typeof parsed?.query !== "string" || typeof parsed?.method !== "string") {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function clearPendingQuery() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(PENDING_QUERY_STORAGE_KEY);
-}
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -168,7 +134,6 @@ export default function ChatPage() {
   const [method, setMethod] = useState<string>("vedic");
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showAuthWall, setShowAuthWall] = useState(false);
   const [ledgerSteps, setLedgerSteps] = useState<
     { step: number; message: string }[]
   >([]);
@@ -178,7 +143,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
-  const replayingPendingQueryRef = useRef(false);
   const streamBuffer = useStreamBuffer();
 
   const scrollToBottom = useCallback(() => {
@@ -205,27 +169,10 @@ export default function ChatPage() {
     }
   }, [method, subscription.canCompare]);
 
-  useEffect(() => {
-    if (currentUser === null && loadPendingQuery()) {
-      setShowAuthWall(true);
-    }
-  }, [currentUser]);
-
   const handleSubmit = useCallback(
     async (query: string, methodOverride?: string) => {
       if (isLoading || currentUser === undefined) return;
       const selectedMethod = methodOverride ?? method;
-
-      if (currentUser === null) {
-        savePendingQuery({
-          query,
-          method: selectedMethod,
-          createdAt: Date.now(),
-        });
-        setMethod(selectedMethod);
-        setShowAuthWall(true);
-        return;
-      }
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -272,16 +219,6 @@ export default function ChatPage() {
         });
 
         if (!authResult.success || !authResult.token || !authResult.streamUrl) {
-          if (authResult.error === "auth_required") {
-            savePendingQuery({
-              query,
-              method: selectedMethod,
-              createdAt: Date.now(),
-            });
-            setShowAuthWall(true);
-          }
-
-          // Rate limited or error
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -289,7 +226,7 @@ export default function ChatPage() {
                     ...m,
                     content:
                       authResult.message ||
-                      "You’re out of messages right now.",
+                      "You\u2019re out of messages right now.",
                   }
                 : m
             )
@@ -570,34 +507,6 @@ export default function ChatPage() {
       streamBuffer,
     ]
   );
-
-  useEffect(() => {
-    if (
-      currentUser === undefined ||
-      currentUser === null ||
-      isLoading ||
-      !chartRaw ||
-      replayingPendingQueryRef.current
-    ) {
-      return;
-    }
-
-    const pending = loadPendingQuery();
-    if (!pending) return;
-
-    replayingPendingQueryRef.current = true;
-    clearPendingQuery();
-    setShowAuthWall(false);
-
-    void (async () => {
-      try {
-        setMethod(pending.method);
-        await handleSubmit(pending.query, pending.method);
-      } finally {
-        replayingPendingQueryRef.current = false;
-      }
-    })();
-  }, [chartRaw, currentUser, isLoading, handleSubmit]);
 
   const handleNewReading = useCallback(() => {
     if (abortRef.current) {
@@ -884,13 +793,6 @@ export default function ChatPage() {
           </>
         )}
       </main>
-
-      <AuthWall
-        isOpen={showAuthWall}
-        onClose={() => setShowAuthWall(false)}
-        reason="Sign in to ask your first question"
-        dismissible={currentUser !== null}
-      />
     </div>
   );
 }
