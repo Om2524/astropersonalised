@@ -4,8 +4,6 @@ import { api } from "../_generated/api";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
-const ANONYMOUS_PREVIEW_LIMIT = 1;
-
 type PublicAction = ReturnType<typeof action>;
 type AuthorizeStreamArgs = {
   sessionId: string;
@@ -122,13 +120,13 @@ export const authorizeStream: PublicAction = action({
         };
       }
 
-      // 3b. Anonymous preview limit — require sign-in after first message
-      if (!args.userId && usage.used >= ANONYMOUS_PREVIEW_LIMIT) {
+      // Account-first onboarding: /chat is unreachable without auth, so
+      // this branch is defensive. Reject anonymous requests outright.
+      if (!args.userId) {
         return {
           success: false,
           error: "auth_required",
-          message:
-            "Sign in to continue this conversation and save your astrology profile.",
+          message: "Please sign in to continue.",
           usage: usageSnapshot,
           tier: tierInfo.tier,
           token: null,
@@ -149,11 +147,6 @@ export const authorizeStream: PublicAction = action({
           console.error("recordUsage failed (non-blocking):", usageErr);
         }
       } else if (usage.nextConsumeSource === "credit") {
-        if (!args.userId) {
-          throw new Error(
-            "Authenticated user required to spend message credits"
-          );
-        }
         await ctx.runMutation(api.functions.queryUsage.recordCreditSpend, {
           userId: args.userId,
           usageKey: args.usageKey,
