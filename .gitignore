@@ -54,6 +54,9 @@ apps/web/.open-next/
 .claude-session
 .claude/
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Misc
 *.log
 *.pid
