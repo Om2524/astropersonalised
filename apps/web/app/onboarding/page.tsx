@@ -1,5 +1,5 @@
 "use client";
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -24,6 +24,7 @@ import {
   getBirthProfileAnalyticsProperties,
   syncBirthProfilePersonProperties,
 } from "@/app/lib/posthogProfile";
+import { prewarmCompute } from "@/app/lib/prewarm";
 import posthog from "posthog-js";
 
 const TONE_OPTIONS: {
@@ -58,6 +59,10 @@ export default function OnboardingPage() {
   const [language, setLanguage] = useState("en");
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    prewarmCompute();
+  }, []);
 
   const canContinueStep1 = dob.length > 0 && birthplace.trim().length > 0;
 

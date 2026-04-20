@@ -20,6 +20,7 @@ import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
 import AuthWall from "@/app/components/AuthWall";
 import { useTranslation } from "@/app/i18n/useTranslation";
+import { prewarmCompute } from "@/app/lib/prewarm";
 import posthog from "posthog-js";
 
 /**
@@ -184,6 +185,10 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, ledgerSteps, scrollToBottom]);
+
+  useEffect(() => {
+    prewarmCompute();
+  }, []);
 
   useEffect(() => {
     if (!subscription.canCompare && method === "compare") {
