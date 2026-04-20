@@ -171,6 +171,11 @@ async def ask_stream(req: AskRequest, _auth: StreamTokenAuth) -> StreamingRespon
     async def event_stream():
         try:
             async with asyncio.timeout(timeout):
+                # Ledger step 0: Immediate heartbeat before any chart work.
+                # Guarantees the frontend sees motion within ~200ms even on a
+                # warm container while Gemini is thinking.
+                yield _sse_event("ledger", {"step": 0, "message": "Connecting to Shastra..."})
+
                 # Ledger step 1: Analyzing
                 yield _sse_event("ledger", {"step": 1, "message": LEDGER_STEPS[0]})
 
