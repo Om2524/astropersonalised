@@ -16,6 +16,7 @@ import PlanetCards from "./components/PlanetCards";
 import YogaCards from "./components/YogaCards";
 import HouseRelevance from "./components/HouseRelevance";
 import DashaBadge from "./components/DashaBadge";
+import RetryPrompt from "./components/RetryPrompt";
 import GalaxyLogo from "@/app/components/GalaxyLogo";
 import UsageIndicator from "@/app/components/UsageIndicator";
 import AuthWall from "@/app/components/AuthWall";
@@ -446,7 +447,12 @@ export default function ChatPage() {
                       m.id === assistantId
                         ? {
                             ...m,
-                            content: `Something went wrong: ${parsed.message}. Please try again.`,
+                            content: `Something went wrong: ${parsed.message}.`,
+                            retryable: {
+                              query,
+                              method: selectedMethod,
+                              usageKey: assistantId,
+                            },
                           }
                         : m
                     )
@@ -505,7 +511,6 @@ export default function ChatPage() {
           }
         }
       } catch (err) {
-        // If the user explicitly cancelled, just stop silently
         if ((err as Error).name === "AbortError" && controller.signal.aborted) {
           streamBuffer.stop();
           setIsLoading(false);
@@ -513,21 +518,30 @@ export default function ChatPage() {
           return;
         }
 
-        // Timeout or other error — show a message
         const isTimeout =
           (err as Error).name === "TimeoutError" ||
           ((err as Error).name === "AbortError" && !controller.signal.aborted);
         const message = fullContent
           ? fullContent
           : isTimeout
-            ? "The stars are taking longer than usual... Please try again."
-            : `Something went wrong: ${(err as Error).message}. Please try again.`;
+            ? "The stars are taking longer than usual."
+            : `Something went wrong: ${(err as Error).message}.`;
 
         streamBuffer.stop();
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: message }
+              ? {
+                  ...m,
+                  content: message,
+                  retryable: fullContent
+                    ? m.retryable
+                    : {
+                        query,
+                        method: selectedMethod,
+                        usageKey: assistantId,
+                      },
+                }
               : m
           )
         );
@@ -652,6 +666,18 @@ export default function ChatPage() {
     [handleSubmit]
   );
 
+  const handleRetry = useCallback(
+    (msgId: string, retryable: { query: string; method: string; usageKey: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      handleSubmit(retryable.query, retryable.method);
+    },
+    [handleSubmit]
+  );
+
+  const handleRetryCancel = useCallback((msgId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+  }, []);
+
   const isEmpty = messages.length === 0;
 
   return (
@@ -759,7 +785,13 @@ export default function ChatPage() {
                           </div>
                         )}
 
-                        {msg.reading ? (
+                        {msg.retryable && !isLoading ? (
+                          <RetryPrompt
+                            message={msg.content || "Please try again."}
+                            onRetry={() => handleRetry(msg.id, msg.retryable!)}
+                            onCancel={() => handleRetryCancel(msg.id)}
+                          />
+                        ) : msg.reading ? (
                           <ReadingCard
                             reading={msg.reading}
                             onAskFollowUp={handleFollowUp}

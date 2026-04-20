@@ -175,5 +175,10 @@ export interface ChatMessage {
   evidence_summary?: Record<string, unknown>;
   planet_context?: PlanetContext;
   method_used?: string;
+  retryable?: {
+    query: string;
+    method: string;
+    usageKey: string;
+  };
   timestamp: number;
 }
