@@ -29,3 +29,7 @@ export const ADMIN_EMAILS: ReadonlySet<string> = new Set([
   "ompatil2524@gmail.com",
   "kushjain125@gmail.com",
 ]);
+
+export const ELEVATED_USER_LIMITS: ReadonlyMap<string, number> = new Map([
+  ["garganirudhstephens@gmail.com", 20],
+]);

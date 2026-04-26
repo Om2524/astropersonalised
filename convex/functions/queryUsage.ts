@@ -2,6 +2,7 @@ import { internalMutation, mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import {
   ADMIN_EMAILS,
+  ELEVATED_USER_LIMITS,
   FREE_WEEKLY_MESSAGE_LIMIT,
   isUnlimitedTier,
 } from "../billingConfig";
@@ -41,6 +42,7 @@ export const checkLimit = query({
   },
   handler: async (ctx, { sessionId, userId, tier }) => {
     // 1. Admin / unlimitedQueries bypass
+    let effectiveLimit = FREE_WEEKLY_MESSAGE_LIMIT;
     if (userId) {
       const user = await ctx.db.get(userId);
       if (user?.email && ADMIN_EMAILS.has(user.email)) {
@@ -48,6 +50,10 @@ export const checkLimit = query({
       }
       if (user?.unlimitedQueries === true) {
         return UNLIMITED_RESPONSE;
+      }
+      if (user?.email) {
+        const custom = ELEVATED_USER_LIMITS.get(user.email);
+        if (custom !== undefined) effectiveLimit = custom;
       }
     }
 
@@ -76,9 +82,7 @@ export const checkLimit = query({
         .collect();
     }
 
-    const freeMessageLimit = userId
-      ? FREE_WEEKLY_MESSAGE_LIMIT
-      : GUEST_PREVIEW_MESSAGE_LIMIT;
+    const freeMessageLimit = userId ? effectiveLimit : GUEST_PREVIEW_MESSAGE_LIMIT;
     const used = usageRecords.length;
     const freeRemaining = Math.max(0, freeMessageLimit - used);
 
